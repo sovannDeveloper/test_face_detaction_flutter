@@ -1,0 +1,19 @@
+{
+  // "dart.flutterSdkPath": "/Volumes/OCSMac/Development/flutter",
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
+  "editor.fontSize": 15,
+  "editor.fontFamily": "JetBrains Mono",
+  "editor.fontLigatures": true,
+  "[dart]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": false,
+    "editor.formatOnType": false,
+    "editor.rulers": [120],
+    "editor.wordBasedSuggestions": "allDocuments"
+  },
+  "files.autoSave": "afterDelay",
+}
