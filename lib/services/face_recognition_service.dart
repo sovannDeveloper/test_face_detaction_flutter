@@ -7,34 +7,49 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 
 class FaceRecognitionService {
   Interpreter? _interpreter;
-  List<List<double>> _registeredFaces = [];
-  List<String> _registeredNames = [];
+  final List<List<double>> _registeredFaces = [];
+  final List<String> _registeredNames = [];
 
   static const int inputSize = 112;
   static const int outputSize = 192;
-  static const double threshold = 0.7;
+  double threshold = 0.5;
+
+  // Method to update threshold
+  void setThreshold(double newThreshold) {
+    threshold = newThreshold;
+  }
 
   Future<void> loadModel() async {
     try {
       _interpreter =
-          await Interpreter.fromAsset('models/mobile_face_net.tflite');
-      print('Model loaded successfully');
+          await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
+      print('✓ Model loaded successfully');
 
       var inputShape = _interpreter!.getInputTensor(0).shape;
       var outputShape = _interpreter!.getOutputTensor(0).shape;
-      print('Input shape: $inputShape');
-      print('Output shape: $outputShape');
+      print('✓ Input shape: $inputShape');
+      print('✓ Output shape: $outputShape');
     } catch (e) {
-      print('Error loading model: $e');
+      print('✗ Error loading model: $e');
+      print(
+          'Make sure you have placed the model file at: assets/models/mobilefacenet.tflite');
+      rethrow;
     }
   }
 
   List<List<List<List<double>>>> preprocessImage(img.Image image) {
+    // Resize image to model input size with better interpolation
     img.Image resizedImage = img.copyResize(
       image,
       width: inputSize,
       height: inputSize,
+      interpolation: img.Interpolation.cubic,
     );
+
+    // Convert to RGB if needed
+    if (resizedImage.numChannels == 4) {
+      resizedImage = img.Image.from(resizedImage);
+    }
 
     var input = List.generate(
       1,
@@ -49,6 +64,7 @@ class FaceRecognitionService {
             int b = pixel.b.toInt();
 
             List<int> rgb = [r, g, b];
+            // Normalize to [-1, 1] range
             return (rgb[c] - 127.5) / 127.5;
           }),
         ),
@@ -60,20 +76,24 @@ class FaceRecognitionService {
 
   Future<List<double>?> getFaceEmbedding(img.Image faceImage) async {
     if (_interpreter == null) {
-      print('Model not loaded');
+      print('✗ Model not loaded');
       return null;
     }
 
     try {
+      print('→ Preprocessing image...');
       var input = preprocessImage(faceImage);
-      var output = List.filled(outputSize, 0.0).reshape([1, outputSize]);
 
+      print('→ Running inference...');
+      var output = List.filled(outputSize, 0.0).reshape([1, outputSize]);
       _interpreter!.run(input, output);
 
+      print('✓ Inference complete');
       List<double> embedding = List<double>.from(output[0]);
       return normalizeEmbedding(embedding);
     } catch (e) {
-      print('Error getting face embedding: $e');
+      print('✗ Error getting face embedding: $e');
+      print('Stack trace: ${StackTrace.current}');
       return null;
     }
   }
@@ -92,55 +112,88 @@ class FaceRecognitionService {
   }
 
   Future<bool> registerFace(img.Image faceImage, String name) async {
+    print('→ Attempting to register face for: $name');
     List<double>? embedding = await getFaceEmbedding(faceImage);
 
     if (embedding == null) {
+      print('✗ Failed to get embedding');
       return false;
     }
 
     _registeredFaces.add(embedding);
     _registeredNames.add(name);
-    print('Face registered for: $name');
+    print('✓ Face registered successfully for: $name');
+    print('✓ Total registered faces: ${_registeredFaces.length}');
     return true;
   }
 
   Future<Map<String, dynamic>?> recognizeFace(img.Image faceImage) async {
-    List<double>? embedding = await getFaceEmbedding(faceImage);
+    final task = Stopwatch()..start();
+    try {
+      print('\n========== RECOGNITION STARTED ==========');
+      List<double>? embedding = await getFaceEmbedding(faceImage);
 
-    if (embedding == null || _registeredFaces.isEmpty) {
-      return null;
-    }
-
-    double maxSimilarity = -1.0;
-    int maxIndex = -1;
-
-    for (int i = 0; i < _registeredFaces.length; i++) {
-      double similarity = cosineSimilarity(embedding, _registeredFaces[i]);
-
-      if (similarity > maxSimilarity) {
-        maxSimilarity = similarity;
-        maxIndex = i;
+      if (embedding == null || _registeredFaces.isEmpty) {
+        print('✗ No embedding or no registered faces');
+        return null;
       }
-    }
 
-    if (maxSimilarity > threshold) {
+      double maxSimilarity = -1.0;
+      int maxIndex = -1;
+      List<Map<String, dynamic>> allMatches = [];
+
+      print('\n--- Comparing with registered faces ---');
+      // Compare with all registered faces
+      for (int i = 0; i < _registeredFaces.length; i++) {
+        double similarity = cosineSimilarity(embedding, _registeredFaces[i]);
+
+        allMatches.add({
+          'name': _registeredNames[i],
+          'similarity': similarity,
+        });
+
+        print(
+            '${i + 1}. ${_registeredNames[i]}: ${(similarity * 100).toStringAsFixed(2)}%');
+
+        if (similarity > maxSimilarity) {
+          maxSimilarity = similarity;
+          maxIndex = i;
+        }
+      }
+
+      print('\n--- Results ---');
+      print('Best match: ${_registeredNames[maxIndex]}');
+      print('Similarity: ${(maxSimilarity * 100).toStringAsFixed(2)}%');
+      print('Threshold: ${(threshold * 100).toStringAsFixed(0)}%');
+      print(
+          'Match status: ${maxSimilarity > threshold ? "✓ MATCHED" : "✗ NOT MATCHED"}');
+      print('========== RECOGNITION ENDED ==========\n');
+
+      if (maxSimilarity > threshold) {
+        return {
+          'name': _registeredNames[maxIndex],
+          'confidence': maxSimilarity,
+          'matched': true,
+          'allMatches': allMatches,
+        };
+      }
+
       return {
-        'name': _registeredNames[maxIndex],
+        'name': 'Unknown',
         'confidence': maxSimilarity,
-        'matched': true,
+        'matched': false,
+        'allMatches': allMatches,
       };
+    } finally {
+      task.stop();
+      print(task.elapsed);
     }
-
-    return {
-      'name': 'Unknown',
-      'confidence': maxSimilarity,
-      'matched': false,
-    };
   }
 
   void clearRegisteredFaces() {
     _registeredFaces.clear();
     _registeredNames.clear();
+    print('✓ All registered faces cleared');
   }
 
   void dispose() {

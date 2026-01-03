@@ -1,170 +1,18 @@
 // File: lib/screens/face_recognition_screen.dart
-// Complete single-file solution
+// Complete single-file solution with improvements
 
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
-import 'package:tflite_flutter/tflite_flutter.dart';
 
-// Face Recognition Service
-class FaceRecognitionService {
-  Interpreter? _interpreter;
-  List<List<double>> _registeredFaces = [];
-  List<String> _registeredNames = [];
-
-  static const int inputSize = 112;
-  static const int outputSize = 192;
-  static const double threshold = 0.7;
-
-  Future<void> loadModel() async {
-    try {
-      _interpreter =
-          await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
-      print('✓ Model loaded successfully');
-
-      var inputShape = _interpreter!.getInputTensor(0).shape;
-      var outputShape = _interpreter!.getOutputTensor(0).shape;
-      print('✓ Input shape: $inputShape');
-      print('✓ Output shape: $outputShape');
-    } catch (e) {
-      print('✗ Error loading model: $e');
-      print(
-          'Make sure you have placed the model file at: assets/models/mobilefacenet.tflite');
-      rethrow;
-    }
-  }
-
-  List<List<List<List<double>>>> preprocessImage(img.Image image) {
-    img.Image resizedImage = img.copyResize(
-      image,
-      width: inputSize,
-      height: inputSize,
-    );
-
-    var input = List.generate(
-      1,
-      (b) => List.generate(
-        inputSize,
-        (y) => List.generate(
-          inputSize,
-          (x) => List.generate(3, (c) {
-            img.Pixel pixel = resizedImage.getPixel(x, y);
-            int r = pixel.r.toInt();
-            int g = pixel.g.toInt();
-            int b = pixel.b.toInt();
-
-            List<int> rgb = [r, g, b];
-            return (rgb[c] - 127.5) / 127.5;
-          }),
-        ),
-      ),
-    );
-
-    return input;
-  }
-
-  Future<List<double>?> getFaceEmbedding(img.Image faceImage) async {
-    if (_interpreter == null) {
-      print('✗ Model not loaded');
-      return null;
-    }
-
-    try {
-      print('→ Preprocessing image...');
-      var input = preprocessImage(faceImage);
-
-      print('→ Running inference...');
-      var output = List.filled(outputSize, 0.0).reshape([1, outputSize]);
-      _interpreter!.run(input, output);
-
-      print('✓ Inference complete');
-      List<double> embedding = List<double>.from(output[0]);
-      return normalizeEmbedding(embedding);
-    } catch (e) {
-      print('✗ Error getting face embedding: $e');
-      print('Stack trace: ${StackTrace.current}');
-      return null;
-    }
-  }
-
-  List<double> normalizeEmbedding(List<double> embedding) {
-    double norm = sqrt(embedding.fold(0.0, (sum, val) => sum + val * val));
-    return embedding.map((val) => val / norm).toList();
-  }
-
-  double cosineSimilarity(List<double> embedding1, List<double> embedding2) {
-    double dotProduct = 0.0;
-    for (int i = 0; i < embedding1.length; i++) {
-      dotProduct += embedding1[i] * embedding2[i];
-    }
-    return dotProduct;
-  }
-
-  Future<bool> registerFace(img.Image faceImage, String name) async {
-    print('→ Attempting to register face for: $name');
-    List<double>? embedding = await getFaceEmbedding(faceImage);
-
-    if (embedding == null) {
-      print('✗ Failed to get embedding');
-      return false;
-    }
-
-    _registeredFaces.add(embedding);
-    _registeredNames.add(name);
-    print('✓ Face registered successfully for: $name');
-    print('✓ Total registered faces: ${_registeredFaces.length}');
-    return true;
-  }
-
-  Future<Map<String, dynamic>?> recognizeFace(img.Image faceImage) async {
-    List<double>? embedding = await getFaceEmbedding(faceImage);
-
-    if (embedding == null || _registeredFaces.isEmpty) {
-      return null;
-    }
-
-    double maxSimilarity = -1.0;
-    int maxIndex = -1;
-
-    for (int i = 0; i < _registeredFaces.length; i++) {
-      double similarity = cosineSimilarity(embedding, _registeredFaces[i]);
-
-      if (similarity > maxSimilarity) {
-        maxSimilarity = similarity;
-        maxIndex = i;
-      }
-    }
-
-    if (maxSimilarity > threshold) {
-      return {
-        'name': _registeredNames[maxIndex],
-        'confidence': maxSimilarity,
-        'matched': true,
-      };
-    }
-
-    return {
-      'name': 'Unknown',
-      'confidence': maxSimilarity,
-      'matched': false,
-    };
-  }
-
-  void clearRegisteredFaces() {
-    _registeredFaces.clear();
-    _registeredNames.clear();
-  }
-
-  void dispose() {
-    _interpreter?.close();
-  }
-}
+import 'services/face_recognition_service.dart';
 
 // Main Screen
 class FaceRecognitionScreen extends StatefulWidget {
+  const FaceRecognitionScreen({super.key});
+
   @override
   _FaceRecognitionScreenState createState() => _FaceRecognitionScreenState();
 }
@@ -176,6 +24,7 @@ class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
   File? _selectedImage;
   String _result = '';
   bool _isLoading = false;
+  double _currentThreshold = 0.5;
 
   @override
   void initState() {
@@ -189,12 +38,12 @@ class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
       await _faceService.loadModel();
       setState(() {
         _isLoading = false;
-        _result = 'Model loaded successfully';
+        _result = '✓ Model loaded successfully\nReady to register faces!';
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _result = 'Failed to load model: $e';
+        _result = '✗ Failed to load model: $e';
       });
     }
   }
@@ -205,7 +54,10 @@ class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
   }
 
   Future<void> _pickAndRegisterFace() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 100, // Use high quality
+    );
 
     if (image == null) return;
 
@@ -223,8 +75,8 @@ class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
         setState(() {
           _selectedImage = imageFile;
           _result = success
-              ? 'Successfully registered: $name'
-              : 'Failed to register face';
+              ? '✓ Successfully registered: $name\n\nTip: Register 2-3 photos of the same person for better accuracy!'
+              : '✗ Failed to register face';
           _isLoading = false;
         });
       } else {
@@ -232,14 +84,17 @@ class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
       }
     } else {
       setState(() {
-        _result = 'Failed to load image';
+        _result = '✗ Failed to load image';
         _isLoading = false;
       });
     }
   }
 
   Future<void> _pickAndRecognizeFace() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 100, // Use high quality
+    );
 
     if (image == null) return;
 
@@ -255,17 +110,32 @@ class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
       setState(() {
         _selectedImage = imageFile;
         if (recognition != null) {
-          _result = recognition['matched']
-              ? 'Recognized: ${recognition['name']}\nConfidence: ${(recognition['confidence'] * 100).toStringAsFixed(2)}%'
-              : 'Unknown face\nHighest similarity: ${(recognition['confidence'] * 100).toStringAsFixed(2)}%';
+          String resultText = recognition['matched']
+              ? '✓ Recognized: ${recognition['name']}\nConfidence: ${(recognition['confidence'] * 100).toStringAsFixed(2)}%'
+              : '✗ Unknown face\nBest match: ${(recognition['confidence'] * 100).toStringAsFixed(2)}%';
+
+          // Show all matches for debugging
+          if (recognition['allMatches'] != null) {
+            resultText += '\n\n--- All Comparisons ---';
+            for (var match in recognition['allMatches']) {
+              String emoji =
+                  match['similarity'] > _currentThreshold ? '✓' : '✗';
+              resultText +=
+                  '\n$emoji ${match['name']}: ${(match['similarity'] * 100).toStringAsFixed(2)}%';
+            }
+            resultText +=
+                '\n\nThreshold: ${(_currentThreshold * 100).toStringAsFixed(0)}%';
+          }
+
+          _result = resultText;
         } else {
-          _result = 'No faces registered or recognition failed';
+          _result = '✗ No faces registered or recognition failed';
         }
         _isLoading = false;
       });
     } else {
       setState(() {
-        _result = 'Failed to load image';
+        _result = '✗ Failed to load image';
         _isLoading = false;
       });
     }
@@ -279,7 +149,10 @@ class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
         title: Text('Register Face'),
         content: TextField(
           autofocus: true,
-          decoration: InputDecoration(hintText: 'Enter name'),
+          decoration: InputDecoration(
+            hintText: 'Enter name',
+            border: OutlineInputBorder(),
+          ),
           onChanged: (value) => name = value,
         ),
         actions: [
@@ -296,18 +169,90 @@ class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
     );
   }
 
+  Future<void> _showThresholdDialog() async {
+    double tempThreshold = _currentThreshold;
+    return showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Adjust Recognition Threshold'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Current: ${(tempThreshold * 100).toStringAsFixed(0)}%',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Lower = More lenient (may match different people)\nHigher = More strict (may not match same person)',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 20),
+              Slider(
+                value: tempThreshold,
+                min: 0.3,
+                max: 0.9,
+                divisions: 60,
+                label: '${(tempThreshold * 100).toStringAsFixed(0)}%',
+                onChanged: (value) {
+                  setDialogState(() {
+                    tempThreshold = value;
+                  });
+                },
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('30%', style: TextStyle(fontSize: 12)),
+                  Text('90%', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _currentThreshold = tempThreshold;
+                  _faceService.setThreshold(tempThreshold);
+                  _result =
+                      '✓ Threshold updated to ${(tempThreshold * 100).toStringAsFixed(0)}%';
+                });
+                Navigator.pop(context);
+              },
+              child: Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Face Recognition'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: Icon(Icons.delete),
+            icon: Icon(Icons.tune),
+            onPressed: _showThresholdDialog,
+            tooltip: 'Adjust threshold',
+          ),
+          IconButton(
+            icon: Icon(Icons.delete_outline),
             onPressed: () {
               _faceService.clearRegisteredFaces();
               setState(() {
-                _result = 'All faces cleared';
+                _result = '✓ All faces cleared';
                 _selectedImage = null;
               });
             },
@@ -315,63 +260,105 @@ class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_selectedImage != null)
-                    Container(
-                      height: 300,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Processing...'),
+                  ],
+                ),
+              )
+            : SingleChildScrollView(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_selectedImage != null)
+                      Container(
+                        height: 300,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.blue, width: 2),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            _selectedImage!,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          _selectedImage!,
-                          fit: BoxFit.cover,
+                    SizedBox(height: 20),
+                    if (_result.isNotEmpty)
+                      Container(
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _result.contains('✓')
+                              ? Colors.green.shade50
+                              : _result.contains('✗')
+                                  ? Colors.red.shade50
+                                  : Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _result.contains('✓')
+                                ? Colors.green
+                                : _result.contains('✗')
+                                    ? Colors.red
+                                    : Colors.blue,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          _result,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                    SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      onPressed: _pickAndRegisterFace,
+                      icon: Icon(Icons.person_add),
+                      label: Text('Register New Face'),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                     ),
-                  SizedBox(height: 20),
-                  if (_result.isNotEmpty)
-                    Container(
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
+                    SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: _pickAndRecognizeFace,
+                      icon: Icon(Icons.face),
+                      label: Text('Recognize Face'),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                      child: Text(
-                        _result,
-                        style: TextStyle(fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
                     ),
-                  SizedBox(height: 30),
-                  ElevatedButton.icon(
-                    onPressed: _pickAndRegisterFace,
-                    icon: Icon(Icons.person_add),
-                    label: Text('Register New Face'),
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _pickAndRecognizeFace,
-                    icon: Icon(Icons.face),
-                    label: Text('Recognize Face'),
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
