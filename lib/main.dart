@@ -1,12 +1,16 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
+import 'package:flu_wake_lock/flu_wake_lock.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
+import 'face.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FluWakeLock().enable();
   final cameras = await availableCameras();
   runApp(MyApp(cameras: cameras));
 }
@@ -18,7 +22,8 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: FaceDetectionPage(cameras: cameras),
+      // home: FaceDetectionPage(cameras: cameras),
+      home: FaceRecognitionScreen(),
     );
   }
 }
@@ -75,7 +80,8 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
       await _cameraController.initialize();
 
       setState(() {
-        _debugMessage = "Camera initialized, preview size: ${_cameraController.value.previewSize}";
+        _debugMessage =
+            "Camera initialized, preview size: ${_cameraController.value.previewSize}";
       });
 
       _imageSize = Size(
@@ -140,7 +146,8 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
         setState(() {
           _faces = faces;
           if (faces.isNotEmpty) {
-            _debugMessage = "Detected ${faces.length} face(s) - Frame $_frameCount";
+            _debugMessage =
+                "Detected ${faces.length} face(s) - Frame $_frameCount";
           } else if (_frameCount > 30) {
             _debugMessage = "No faces detected - Frame $_frameCount";
           }
@@ -288,7 +295,8 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
                             'Head Euler Angle Z: ${_faces[i].headEulerAngleZ?.toStringAsFixed(2) ?? 'N/A'}\n'
                             'Real-time: ${_cameraController.value.isStreamingImages ? "Yes" : "No"}',
                             key: Key('face_$i'),
-                            style: const TextStyle(color: Colors.white, fontSize: 10)),
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 10)),
                       );
                     }),
                   ),
@@ -375,7 +383,8 @@ class FacePainter extends CustomPainter {
       // Draw a center point for debugging
       final centerX = rect.left + (rect.width / 2);
       final centerY = rect.top + (rect.height / 2);
-      canvas.drawCircle(Offset(centerX, centerY), 5.0, Paint()..color = Colors.yellow);
+      canvas.drawCircle(
+          Offset(centerX, centerY), 5.0, Paint()..color = Colors.yellow);
 
       // Draw face landmarks if available
       if (face.landmarks.isNotEmpty) {
