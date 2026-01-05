@@ -23,6 +23,8 @@ dependencies:
 
   flu_wake_lock:
     git: https://github.com/sovannDeveloper/wakelock.git
+  division:
+    git: https://github.com/sovannDeveloper/division.git
 
 dev_dependencies:
   flutter_test:

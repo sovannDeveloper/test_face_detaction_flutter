@@ -7,9 +7,16 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 enum CameraState { done, none }
 
+class FaceData {
+  final List<Face> faces;
+  final Size imageSize;
+
+  FaceData({this.faces = const [], this.imageSize = Size.zero});
+}
+
 class FaceDetectionService {
   late CameraDescription _camera = cameras.first;
-  final onDetection = StreamController<List<Face>>.broadcast();
+  final onDetection = StreamController<FaceData>.broadcast();
   final cameraState = StreamController<CameraState>.broadcast();
 
   FaceDetectionService() {
@@ -23,6 +30,8 @@ class FaceDetectionService {
   bool _isDetecting = false;
   int _frameCount = 0;
   late CameraController cameraController;
+
+  CameraDescription get getCamera => _camera;
 
   Future<void> _initCamera(CameraDescription camera) async {
     cameraState.add(CameraState.none);
@@ -63,8 +72,7 @@ class FaceDetectionService {
     options: FaceDetectorOptions(
       enableClassification: true,
       enableLandmarks: true,
-      minFaceSize: 1, // Allow smaller faces
-      performanceMode: FaceDetectorMode.accurate, // Use fast mode
+      performanceMode: FaceDetectorMode.accurate,
     ),
   );
 
@@ -101,7 +109,10 @@ class FaceDetectionService {
 
       final faces = await detector.processImage(inputImage);
 
-      onDetection.add(faces);
+      onDetection.add(FaceData(
+        faces: faces,
+        imageSize: Size(image.width.toDouble(), image.height.toDouble()),
+      ));
     } catch (e) {
       print('Error processing image: $e');
     } finally {
