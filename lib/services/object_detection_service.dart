@@ -3,34 +3,31 @@ import 'dart:ui';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
 
 enum CameraState { done, none }
 
-class FaceData {
-  final List<Face> faces;
+class ObjectData {
+  final List<DetectedObject> objects;
   final Size imageSize;
   final Size screenSize;
 
-  FaceData({
-    this.faces = const [],
+  ObjectData({
+    this.objects = const [],
     this.imageSize = Size.zero,
     this.screenSize = Size.zero,
   });
 }
 
-class FaceDetectionService {
+class ObjectDetectionService {
   late CameraDescription _camera = cameras.first;
-  final onDetection = StreamController<FaceData>.broadcast();
+  final onDetection = StreamController<ObjectData>.broadcast();
   final cameraState = StreamController<CameraState>.broadcast();
 
-  late Size screenSize;
-
-  FaceDetectionService([Size? screenSize0]) {
-    screenSize = screenSize0 ?? Size.zero;
+  ObjectDetectionService([Size? screenSize0]) {
     cameraState.add(CameraState.none);
     _camera = cameras.firstWhere(
-      (e) => e.lensDirection == CameraLensDirection.front,
+      (e) => e.lensDirection == CameraLensDirection.back,
     );
     _initCamera(_camera);
   }
@@ -48,7 +45,7 @@ class FaceDetectionService {
 
     cameraController = CameraController(
       camera,
-      ResolutionPreset.max,
+      ResolutionPreset.high,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
@@ -77,18 +74,37 @@ class FaceDetectionService {
     await _initCamera(_camera);
   }
 
-  final detector = FaceDetector(
-    options: FaceDetectorOptions(
-      enableClassification: true,
-      enableLandmarks: true,
-      performanceMode: FaceDetectorMode.accurate,
-    ),
-  );
+  // Initialize object detector
+  late final ObjectDetector detector;
+
+  Future<void> _initializeDetector() async {
+    final options = ObjectDetectorOptions(
+      mode: DetectionMode.stream,
+      classifyObjects: true,
+      multipleObjects: true,
+    );
+    detector = ObjectDetector(options: options);
+  }
+
+  // Alternative: Use custom model
+  Future<void> _initializeCustomDetector(String modelPath) async {
+    final options = LocalObjectDetectorOptions(
+      mode: DetectionMode.stream,
+      modelPath: modelPath,
+      classifyObjects: true,
+      multipleObjects: true,
+    );
+    detector = ObjectDetector(options: options);
+  }
 
   List<CameraDescription> get cameras => _cameras;
 
   static Future<void> initCameras() async {
     _cameras = await availableCameras();
+  }
+
+  Future<void> initialize() async {
+    await _initializeDetector();
   }
 
   void _processCameraImage(CameraImage image) async {
@@ -126,10 +142,10 @@ class FaceDetectionService {
         ),
       );
 
-      final faces = await detector.processImage(inputImage);
+      final objects = await detector.processImage(inputImage);
 
-      onDetection.add(FaceData(
-          faces: faces, imageSize: rotatedImageSize, screenSize: screenSize));
+      onDetection
+          .add(ObjectData(objects: objects, imageSize: rotatedImageSize));
     } catch (e) {
       print('Error processing image: $e');
     } finally {

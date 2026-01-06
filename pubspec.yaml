@@ -25,6 +25,10 @@ dependencies:
     git: https://github.com/sovannDeveloper/wakelock.git
   division:
     git: https://github.com/sovannDeveloper/division.git
+  video_player: ^2.9.5
+  path_provider: ^2.1.5
+  ffmpeg_kit_flutter_new: ^4.1.0
+  google_mlkit_object_detection: ^0.15.0
 
 dev_dependencies:
   flutter_test:
