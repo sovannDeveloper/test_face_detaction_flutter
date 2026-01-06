@@ -63,7 +63,7 @@ class FacePainter extends CustomPainter {
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
-      ..color = Colors.green;
+      ..color = const Color.fromARGB(255, 255, 0, 0);
 
     for (int i = 0; i < faces.length; i++) {
       final face = faces[i];
@@ -79,9 +79,9 @@ class FacePainter extends CustomPainter {
       // Draw text label
       _drawText(
         canvas: canvas,
-        text: 'Face ${i + 1}',
-        position: Offset(rect.left, rect.top - 25),
-        backgroundColor: Colors.green,
+        text: 'Unknown ${i + 1}',
+        position: Offset(rect.left - 1, rect.top - 20),
+        backgroundColor: const Color.fromARGB(255, 255, 0, 0),
       );
 
       // Draw smile probability if available
@@ -90,7 +90,7 @@ class FacePainter extends CustomPainter {
           canvas: canvas,
           text:
               'Smile: ${(face.smilingProbability! * 100).toStringAsFixed(0)}%',
-          position: Offset(rect.left, rect.bottom + 5),
+          position: Offset(rect.left -1, rect.bottom + 1),
           backgroundColor: Colors.blue,
         );
       }
@@ -112,7 +112,7 @@ class FacePainter extends CustomPainter {
         _drawText(
           canvas: canvas,
           text: eyeText,
-          position: Offset(rect.left, rect.bottom + 30),
+          position: Offset(rect.left-1, rect.bottom + 20),
           backgroundColor: Colors.orange,
         );
       }
@@ -179,12 +179,17 @@ class FacePainter extends CustomPainter {
     final double offsetY = (widgetSize.height - scaledHeight) / 2;
 
     // Scale the rectangle
-    final left = rect.left * scale + offsetX;
-    final top = rect.top * scale + offsetY;
-    final right = rect.right * scale + offsetX;
-    final bottom = rect.bottom * scale + offsetY;
+    double left = rect.left * scale + offsetX;
+    double top = rect.top * scale + offsetY;
+    double right = rect.right * scale + offsetX;
+    double bottom = rect.bottom * scale + offsetY;
 
-    return Rect.fromLTRB(left, top, right, bottom);
+    return Rect.fromLTRB(
+      left.clamp(0, left),
+      top.clamp(0, top),
+      right.clamp(0, right),
+      bottom.clamp(0, bottom),
+    );
   }
 
   @override

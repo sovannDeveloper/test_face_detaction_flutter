@@ -29,23 +29,6 @@ class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeModel();
-  }
-
-  Future<void> _initializeModel() async {
-    setState(() => _isLoading = true);
-    try {
-      await _faceService.loadModel();
-      setState(() {
-        _isLoading = false;
-        _result = '✓ Model loaded successfully\nReady to register faces!';
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _result = '✗ Failed to load model: $e';
-      });
-    }
   }
 
   Future<img.Image?> _loadImageFile(File file) async {

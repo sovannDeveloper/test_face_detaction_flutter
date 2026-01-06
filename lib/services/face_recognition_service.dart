@@ -1,14 +1,16 @@
 // File: lib/services/face_recognition_service.dart
 
+import 'dart:io';
 import 'dart:math';
 
 import 'package:image/image.dart' as img;
+import 'package:test_face_detaction/img_util.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 
 class FaceRecognitionService {
-  Interpreter? _interpreter;
-  final List<List<double>> _registeredFaces = [];
-  final List<String> _registeredNames = [];
+  static Interpreter? interpreter;
+  static List<List<double>> registeredFaces = [];
+  static List<String> registeredNames = [];
 
   static const int inputSize = 112;
   static const int outputSize = 192;
@@ -19,14 +21,14 @@ class FaceRecognitionService {
     threshold = newThreshold;
   }
 
-  Future<void> loadModel() async {
+  static Future<void> loadModel() async {
     try {
-      _interpreter =
+      interpreter =
           await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
       print('✓ Model loaded successfully');
 
-      var inputShape = _interpreter!.getInputTensor(0).shape;
-      var outputShape = _interpreter!.getOutputTensor(0).shape;
+      var inputShape = interpreter!.getInputTensor(0).shape;
+      var outputShape = interpreter!.getOutputTensor(0).shape;
       print('✓ Input shape: $inputShape');
       print('✓ Output shape: $outputShape');
     } catch (e) {
@@ -37,7 +39,7 @@ class FaceRecognitionService {
     }
   }
 
-  List<List<List<List<double>>>> preprocessImage(img.Image image) {
+  static List<List<List<List<double>>>> preprocessImage(img.Image image) {
     // Resize image to model input size with better interpolation
     img.Image resizedImage = img.copyResize(
       image,
@@ -74,8 +76,8 @@ class FaceRecognitionService {
     return input;
   }
 
-  Future<List<double>?> getFaceEmbedding(img.Image faceImage) async {
-    if (_interpreter == null) {
+  static Future<List<double>?> getFaceEmbedding(img.Image faceImage) async {
+    if (interpreter == null) {
       print('✗ Model not loaded');
       return null;
     }
@@ -86,7 +88,7 @@ class FaceRecognitionService {
 
       print('→ Running inference...');
       var output = List.filled(outputSize, 0.0).reshape([1, outputSize]);
-      _interpreter!.run(input, output);
+      interpreter!.run(input, output);
 
       print('✓ Inference complete');
       List<double> embedding = List<double>.from(output[0]);
@@ -98,7 +100,7 @@ class FaceRecognitionService {
     }
   }
 
-  List<double> normalizeEmbedding(List<double> embedding) {
+  static List<double> normalizeEmbedding(List<double> embedding) {
     double norm = sqrt(embedding.fold(0.0, (sum, val) => sum + val * val));
     return embedding.map((val) => val / norm).toList();
   }
@@ -111,6 +113,30 @@ class FaceRecognitionService {
     return dotProduct;
   }
 
+  // Get register faces
+  static Future<void> loadRegisterFaces() async {
+    final images = await ImageStorageUtil.loadAllImages();
+    List<List<double>> registerFaces0 = [];
+    List<String> registeredNames0 = [];
+
+    for (final e in images) {
+      final bytes = await File(e.path).readAsBytes();
+      final faceImage = img.decodeImage(bytes);
+
+      if (faceImage == null) continue;
+
+      List<double>? embedding = await getFaceEmbedding(faceImage);
+
+      if (embedding == null) continue;
+
+      registerFaces0.add(embedding);
+      registeredNames0.add('value');
+    }
+
+    registeredFaces = registerFaces0;
+    registeredNames = registeredNames0;
+  }
+
   Future<bool> registerFace(img.Image faceImage, String name) async {
     print('→ Attempting to register face for: $name');
     List<double>? embedding = await getFaceEmbedding(faceImage);
@@ -120,10 +146,10 @@ class FaceRecognitionService {
       return false;
     }
 
-    _registeredFaces.add(embedding);
-    _registeredNames.add(name);
+    registeredFaces.add(embedding);
+    registeredNames.add(name);
     print('✓ Face registered successfully for: $name');
-    print('✓ Total registered faces: ${_registeredFaces.length}');
+    print('✓ Total registered faces: ${registeredFaces.length}');
     return true;
   }
 
@@ -133,7 +159,7 @@ class FaceRecognitionService {
       print('\n========== RECOGNITION STARTED ==========');
       List<double>? embedding = await getFaceEmbedding(faceImage);
 
-      if (embedding == null || _registeredFaces.isEmpty) {
+      if (embedding == null || registeredFaces.isEmpty) {
         print('✗ No embedding or no registered faces');
         return null;
       }
@@ -144,16 +170,16 @@ class FaceRecognitionService {
 
       print('\n--- Comparing with registered faces ---');
       // Compare with all registered faces
-      for (int i = 0; i < _registeredFaces.length; i++) {
-        double similarity = cosineSimilarity(embedding, _registeredFaces[i]);
+      for (int i = 0; i < registeredFaces.length; i++) {
+        double similarity = cosineSimilarity(embedding, registeredFaces[i]);
 
         allMatches.add({
-          'name': _registeredNames[i],
+          'name': registeredNames[i],
           'similarity': similarity,
         });
 
         print(
-            '${i + 1}. ${_registeredNames[i]}: ${(similarity * 100).toStringAsFixed(2)}%');
+            '${i + 1}. ${registeredNames[i]}: ${(similarity * 100).toStringAsFixed(2)}%');
 
         if (similarity > maxSimilarity) {
           maxSimilarity = similarity;
@@ -162,7 +188,7 @@ class FaceRecognitionService {
       }
 
       print('\n--- Results ---');
-      print('Best match: ${_registeredNames[maxIndex]}');
+      print('Best match: ${registeredNames[maxIndex]}');
       print('Similarity: ${(maxSimilarity * 100).toStringAsFixed(2)}%');
       print('Threshold: ${(threshold * 100).toStringAsFixed(0)}%');
       print(
@@ -171,7 +197,7 @@ class FaceRecognitionService {
 
       if (maxSimilarity > threshold) {
         return {
-          'name': _registeredNames[maxIndex],
+          'name': registeredNames[maxIndex],
           'confidence': maxSimilarity,
           'matched': true,
           'allMatches': allMatches,
@@ -191,12 +217,12 @@ class FaceRecognitionService {
   }
 
   void clearRegisteredFaces() {
-    _registeredFaces.clear();
-    _registeredNames.clear();
+    registeredFaces.clear();
+    registeredNames.clear();
     print('✓ All registered faces cleared');
   }
 
   void dispose() {
-    _interpreter?.close();
+    interpreter?.close();
   }
 }

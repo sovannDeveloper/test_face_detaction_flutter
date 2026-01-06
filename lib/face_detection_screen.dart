@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:test_face_detaction/services/face_detection_service.dart';
@@ -17,20 +15,6 @@ class FaceDetectionPage extends StatefulWidget {
 class _FaceDetectionPageState extends State<FaceDetectionPage> {
   final _faceRecognitionService = FaceRecognitionService();
   late final _faceDetection = FaceDetectionService(MediaQuery.of(context).size);
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeServices();
-  }
-
-  Future<void> _initializeServices() async {
-    try {
-      await _faceRecognitionService.loadModel();
-    } catch (e) {
-      print('Failed to initialize services: $e');
-    }
-  }
 
   @override
   void dispose() {
@@ -66,8 +50,6 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
                             CameraPreview(_faceDetection.cameraController),
                           if (faces.isNotEmpty)
                             CustomPaint(painter: FacePainter(faces, imgSize)),
-
-                          // buildInfo(_faceDetection),
                           Positioned(
                             top: 0,
                             right: 0,
