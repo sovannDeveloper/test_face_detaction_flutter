@@ -2,18 +2,15 @@ import 'package:flu_wake_lock/flu_wake_lock.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'face_detection_screen.dart';
-import 'img_util.dart';
-import 'services/face_detection_service.dart';
-import 'services/face_recognition_service.dart';
+import 'face_attendance.dart/main.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FluWakeLock().enable();
 
   Future.wait([
-    FaceDetectionService.initCameras(),
-    FaceRecognitionService.loadModel(),
+    // FaceDetectionService.initCameras(),
+    // FaceRecognitionService.loadModel(),
   ]);
   runApp(MyApp());
 }
@@ -48,8 +45,8 @@ class _MyMainScreenState extends State<MyMainScreen> {
             children: [
               ElevatedButton(
                   onPressed: () async {
-                    await FaceRecognitionService.loadRegisterFaces();
-                    _go(const FaceDetectionPage());
+                    // await FaceRecognitionService.loadRegisterFaces();
+                    _go(const FaceScreen());
                   },
                   child: const Text('Go to face detection')),
               // ElevatedButton(
@@ -57,79 +54,79 @@ class _MyMainScreenState extends State<MyMainScreen> {
               //       _go(FaceRecognitionScreen());
               //     },
               //     child: const Text('Go to face recognition')),
-              Divider(),
-              ElevatedButton(
-                  onPressed: () async {
-                    final img = await ImageStorageUtil.pickFromGallery();
-                    if (img != null) {
-                      await ImageStorageUtil.saveImage(img);
-                      setState(() {});
-                    }
-                  },
-                  child: const Text('Register Faces')),
-              FutureBuilder(
-                  future: ImageStorageUtil.loadAllImages(),
-                  builder: (_, s) {
-                    final images = s.data ?? [];
+              // Divider(),
+              // ElevatedButton(
+              //     onPressed: () async {
+              //       final img = await ImageStorageUtil.pickFromGallery();
+              //       if (img != null) {
+              //         await ImageStorageUtil.saveImage(img);
+              //         setState(() {});
+              //       }
+              //     },
+              //     child: const Text('Register Faces')),
+              // FutureBuilder(
+              //     future: ImageStorageUtil.loadAllImages(),
+              //     builder: (_, s) {
+              //       final images = s.data ?? [];
 
-                    return images.isEmpty
-                        ? const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.image,
-                                    size: 100, color: Colors.grey),
-                                SizedBox(height: 20),
-                                Text('No images',
-                                    style: TextStyle(color: Colors.grey)),
-                              ],
-                            ),
-                          )
-                        : GridView.builder(
-                            shrinkWrap: true,
-                            primary: false,
-                            padding: const EdgeInsets.all(8),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              crossAxisSpacing: 8,
-                              mainAxisSpacing: 8,
-                            ),
-                            itemCount: images.length,
-                            itemBuilder: (context, index) {
-                              final image = images[index];
-                              return GestureDetector(
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    Image.file(image, fit: BoxFit.cover),
-                                    Positioned(
-                                      top: 4,
-                                      right: 4,
-                                      child: IconButton(
-                                        icon: const Icon(Icons.delete,
-                                            color: Colors.red, size: 20),
-                                        onPressed: () async {
-                                          final deleted = await ImageStorageUtil
-                                              .deleteImage(image.path);
-                                          if (deleted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                  content:
-                                                      Text('Image deleted')),
-                                            );
-                                            setState(() {});
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          );
-                  })
+              //       return images.isEmpty
+              //           ? const Center(
+              //               child: Column(
+              //                 mainAxisAlignment: MainAxisAlignment.center,
+              //                 children: [
+              //                   Icon(Icons.image,
+              //                       size: 100, color: Colors.grey),
+              //                   SizedBox(height: 20),
+              //                   Text('No images',
+              //                       style: TextStyle(color: Colors.grey)),
+              //                 ],
+              //               ),
+              //             )
+              //           : GridView.builder(
+              //               shrinkWrap: true,
+              //               primary: false,
+              //               padding: const EdgeInsets.all(8),
+              //               gridDelegate:
+              //                   const SliverGridDelegateWithFixedCrossAxisCount(
+              //                 crossAxisCount: 3,
+              //                 crossAxisSpacing: 8,
+              //                 mainAxisSpacing: 8,
+              //               ),
+              //               itemCount: images.length,
+              //               itemBuilder: (context, index) {
+              //                 final image = images[index];
+              //                 return GestureDetector(
+              //                   child: Stack(
+              //                     fit: StackFit.expand,
+              //                     children: [
+              //                       Image.file(image, fit: BoxFit.cover),
+              //                       Positioned(
+              //                         top: 4,
+              //                         right: 4,
+              //                         child: IconButton(
+              //                           icon: const Icon(Icons.delete,
+              //                               color: Colors.red, size: 20),
+              //                           onPressed: () async {
+              //                             final deleted = await ImageStorageUtil
+              //                                 .deleteImage(image.path);
+              //                             if (deleted) {
+              //                               ScaffoldMessenger.of(context)
+              //                                   .showSnackBar(
+              //                                 const SnackBar(
+              //                                     content:
+              //                                         Text('Image deleted')),
+              //                               );
+              //                               setState(() {});
+              //                             }
+              //                           },
+              //                         ),
+              //                       ),
+              //                     ],
+              //                   ),
+              //                 );
+              //               },
+              //             );
+              //     })
             ],
           ),
         ),

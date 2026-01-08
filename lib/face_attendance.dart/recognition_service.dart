@@ -1,10 +1,5 @@
-import 'dart:io';
-import 'dart:math';
-import 'dart:typed_data';
 
-import 'package:image/image.dart' as img;
-import 'package:test_face_detaction/img_util.dart';
-import 'package:tflite_flutter/tflite_flutter.dart';
+part of 'main.dart';
 
 class FaceRecognitionService {
   static Interpreter? interpreter;
