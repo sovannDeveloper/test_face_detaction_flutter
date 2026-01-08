@@ -63,6 +63,11 @@ class _FaceScreenState extends State<FaceScreen> {
             : Column(
                 children: [
                   Center(child: CameraPreview(_cameraController)),
+                  StreamBuilder(
+                      stream: _detection.onDetection.stream,
+                      builder: (_, s) {
+                        return Text('Hello ${s.data?.faces}');
+                      }),
                 ],
               ),
       ),
