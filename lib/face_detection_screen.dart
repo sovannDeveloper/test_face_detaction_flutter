@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:test_face_detaction/services/face_detection_service.dart';
@@ -27,44 +29,67 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
-        body: StreamBuilder<CameraState>(
-            stream: _faceDetection.cameraState.stream,
-            builder: (context, c) {
-              if (c.data != CameraState.done) {
-                return const Center(child: CircularProgressIndicator());
-              }
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              StreamBuilder<CameraState>(
+                  stream: _faceDetection.cameraState.stream,
+                  builder: (context, c) {
+                    if (c.data != CameraState.done) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-              return StreamBuilder(
-                  stream: _faceDetection.onDetection.stream,
-                  builder: (_, s) {
-                    final faces = s.data?.faces ?? [];
-                    final imgSize = s.data?.imageSize ?? Size.zero;
+                    return StreamBuilder(
+                        stream: _faceDetection.onDetection.stream,
+                        builder: (_, s) {
+                          final faces = s.data?.faces ?? [];
+                          final imgSize = s.data?.imageSize ?? Size.zero;
 
-                    return AspectRatio(
-                      aspectRatio: imgSize.width / imgSize.height,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        fit: StackFit.expand,
-                        children: [
-                          if (c.data == CameraState.done)
-                            CameraPreview(_faceDetection.cameraController),
-                          if (faces.isNotEmpty)
-                            CustomPaint(painter: FacePainter(faces, imgSize)),
-                          Positioned(
-                            top: 0,
-                            right: 0,
-                            child: IconButton(
-                              icon: const Icon(Icons.flip_camera_ios),
-                              onPressed: () {
-                                _faceDetection.toggleCamera();
-                              },
+                          return AspectRatio(
+                            aspectRatio: imgSize.width / imgSize.height,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              fit: StackFit.expand,
+                              children: [
+                                if (c.data == CameraState.done)
+                                  CameraPreview(
+                                      _faceDetection.cameraController),
+                                if (faces.isNotEmpty)
+                                  CustomPaint(
+                                      painter: FacePainter(faces, imgSize)),
+                                Positioned(
+                                  top: 0,
+                                  right: 0,
+                                  child: IconButton(
+                                    icon: const Icon(Icons.flip_camera_ios),
+                                    onPressed: () {
+                                      _faceDetection.toggleCamera();
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  });
-            }),
+                          );
+                        });
+                  }),
+              StreamBuilder(
+                  stream: _faceDetection.onRecognize.stream,
+                  builder: (_, s) {
+                    final data = s.data;
+
+                    if (data is String) {
+                      return Text(data);
+                    }
+
+                    if (data is Uint8List) {
+                      return SizedBox(width: 200, child: Image.memory(data));
+                    }
+
+                    return const SizedBox();
+                  })
+            ],
+          ),
+        ),
       ),
     );
   }

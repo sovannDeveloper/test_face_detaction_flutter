@@ -1,7 +1,6 @@
-// File: lib/services/face_recognition_service.dart
-
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 import 'package:test_face_detaction/img_util.dart';
@@ -16,66 +15,72 @@ class FaceRecognitionService {
   static const int outputSize = 192;
   double threshold = 0.5;
 
-  // Method to update threshold
+  // Cache for preprocessing
+  static Float32List? _inputBuffer;
+  static Float32List? _outputBuffer;
+
   void setThreshold(double newThreshold) {
     threshold = newThreshold;
   }
 
   static Future<void> loadModel() async {
     try {
-      interpreter =
-          await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
+      final options = InterpreterOptions()
+        ..threads = 4 // Use multiple threads
+        ..useNnApiForAndroid = true; // Use Android Neural Networks API
+
+      interpreter = await Interpreter.fromAsset(
+        'assets/models/mobilefacenet.tflite',
+        options: options,
+      );
+
       print('✓ Model loaded successfully');
 
       var inputShape = interpreter!.getInputTensor(0).shape;
       var outputShape = interpreter!.getOutputTensor(0).shape;
       print('✓ Input shape: $inputShape');
       print('✓ Output shape: $outputShape');
+
+      // Pre-allocate buffers for better performance
+      _inputBuffer = Float32List(1 * inputSize * inputSize * 3);
+      _outputBuffer = Float32List(outputSize);
+
+      print('✓ Buffers pre-allocated');
     } catch (e) {
       print('✗ Error loading model: $e');
-      print(
-          'Make sure you have placed the model file at: assets/models/mobilefacenet.tflite');
       rethrow;
     }
   }
 
-  static List<List<List<List<double>>>> preprocessImage(img.Image image) {
-    // Resize image to model input size with better interpolation
+  // OPTIMIZED: Direct buffer manipulation instead of nested lists
+  static Float32List preprocessImageOptimized(img.Image image) {
+    // Resize image
     img.Image resizedImage = img.copyResize(
       image,
       width: inputSize,
       height: inputSize,
-      interpolation: img.Interpolation.cubic,
+      interpolation: img.Interpolation.linear, // Linear is faster than cubic
     );
 
-    // Convert to RGB if needed
-    if (resizedImage.numChannels == 4) {
-      resizedImage = img.Image.from(resizedImage);
+    // Pre-allocate buffer if not exists
+    _inputBuffer ??= Float32List(1 * inputSize * inputSize * 3);
+
+    int pixelIndex = 0;
+    for (int y = 0; y < inputSize; y++) {
+      for (int x = 0; x < inputSize; x++) {
+        img.Pixel pixel = resizedImage.getPixel(x, y);
+
+        // Normalize to [-1, 1] range and store directly in buffer
+        _inputBuffer![pixelIndex++] = (pixel.r.toDouble() - 127.5) / 127.5;
+        _inputBuffer![pixelIndex++] = (pixel.g.toDouble() - 127.5) / 127.5;
+        _inputBuffer![pixelIndex++] = (pixel.b.toDouble() - 127.5) / 127.5;
+      }
     }
 
-    var input = List.generate(
-      1,
-      (b) => List.generate(
-        inputSize,
-        (y) => List.generate(
-          inputSize,
-          (x) => List.generate(3, (c) {
-            img.Pixel pixel = resizedImage.getPixel(x, y);
-            int r = pixel.r.toInt();
-            int g = pixel.g.toInt();
-            int b = pixel.b.toInt();
-
-            List<int> rgb = [r, g, b];
-            // Normalize to [-1, 1] range
-            return (rgb[c] - 127.5) / 127.5;
-          }),
-        ),
-      ),
-    );
-
-    return input;
+    return _inputBuffer!;
   }
 
+  // OPTIMIZED: Fast embedding generation
   static Future<List<double>?> getFaceEmbedding(img.Image faceImage) async {
     if (interpreter == null) {
       print('✗ Model not loaded');
@@ -83,28 +88,46 @@ class FaceRecognitionService {
     }
 
     try {
-      print('→ Preprocessing image...');
-      var input = preprocessImage(faceImage);
+      // Use optimized preprocessing
+      var input = preprocessImageOptimized(faceImage);
 
-      print('→ Running inference...');
-      var output = List.filled(outputSize, 0.0).reshape([1, outputSize]);
-      interpreter!.run(input, output);
+      // Reshape for model input
+      var inputReshaped = input.reshape([1, inputSize, inputSize, 3]);
 
-      print('✓ Inference complete');
+      // Pre-allocate output buffer
+      _outputBuffer ??= Float32List(outputSize);
+      var output = _outputBuffer!.reshape([1, outputSize]);
+
+      // Run inference
+      interpreter!.run(inputReshaped, output);
+
+      // Convert to list and normalize
       List<double> embedding = List<double>.from(output[0]);
-      return normalizeEmbedding(embedding);
+      return normalizeEmbeddingFast(embedding);
     } catch (e) {
       print('✗ Error getting face embedding: $e');
-      print('Stack trace: ${StackTrace.current}');
       return null;
     }
   }
 
-  static List<double> normalizeEmbedding(List<double> embedding) {
-    double norm = sqrt(embedding.fold(0.0, (sum, val) => sum + val * val));
-    return embedding.map((val) => val / norm).toList();
+  // OPTIMIZED: Fast normalization using reduce
+  static List<double> normalizeEmbeddingFast(List<double> embedding) {
+    double sumSquared = 0.0;
+    for (int i = 0; i < embedding.length; i++) {
+      sumSquared += embedding[i] * embedding[i];
+    }
+    double norm = sqrt(sumSquared);
+
+    if (norm == 0.0) return embedding;
+
+    // In-place normalization
+    for (int i = 0; i < embedding.length; i++) {
+      embedding[i] /= norm;
+    }
+    return embedding;
   }
 
+  // OPTIMIZED: Fast cosine similarity
   double cosineSimilarity(List<double> embedding1, List<double> embedding2) {
     double dotProduct = 0.0;
     for (int i = 0; i < embedding1.length; i++) {
@@ -113,32 +136,76 @@ class FaceRecognitionService {
     return dotProduct;
   }
 
-  // Get register faces
-  static Future<void> loadRegisterFaces() async {
-    final images = await ImageStorageUtil.loadAllImages();
-    List<List<double>> registerFaces0 = [];
-    List<String> registeredNames0 = [];
+  // OPTIMIZED: Load registered faces
+  static Future<void> loadRegisterFaces({
+    Function(int current, int total)? onProgress,
+  }) async {
+    try {
+      final images = await ImageStorageUtil.loadAllImages();
 
-    for (final e in images) {
-      final bytes = await File(e.path).readAsBytes();
-      final faceImage = img.decodeImage(bytes);
+      if (images.isEmpty) {
+        print('No images found to register');
+        registeredFaces = [];
+        registeredNames = [];
+        return;
+      }
 
-      if (faceImage == null) continue;
+      List<List<double>> registerFaces0 = [];
+      List<String> registeredNames0 = [];
 
-      List<double>? embedding = await getFaceEmbedding(faceImage);
+      print('Loading ${images.length} face(s) for registration...');
 
-      if (embedding == null) continue;
+      for (int i = 0; i < images.length; i++) {
+        try {
+          final e = images[i];
+          final bytes = await File(e.path).readAsBytes();
+          final faceImage = img.decodeImage(bytes);
 
-      registerFaces0.add(embedding);
-      registeredNames0.add('value');
+          if (faceImage == null) {
+            print('Failed to decode image: ${e.path}');
+            continue;
+          }
+
+          final embedding = await getFaceEmbedding(faceImage);
+
+          if (embedding == null) {
+            print('No face detected in image: ${e.path}');
+            continue;
+          }
+
+          registerFaces0.add(embedding);
+          final name = _extractNameFromPath(e.path) ?? 'User ${i + 1}';
+          registeredNames0.add(name);
+
+          onProgress?.call(i + 1, images.length);
+          print('Registered face ${i + 1}/${images.length}: $name');
+        } catch (e) {
+          print('Error processing image at index $i: $e');
+          continue;
+        }
+      }
+
+      registeredFaces = registerFaces0;
+      registeredNames = registeredNames0;
+
+      print('Successfully registered ${registerFaces0.length} face(s)');
+    } catch (e) {
+      print('Error loading registered faces: $e');
+      registeredFaces = [];
+      registeredNames = [];
     }
+  }
 
-    registeredFaces = registerFaces0;
-    registeredNames = registeredNames0;
+  static String? _extractNameFromPath(String path) {
+    try {
+      final fileName = path.split('/').last.split('.').first;
+      return fileName.replaceAll('_', ' ').replaceAll('-', ' ').trim();
+    } catch (e) {
+      return null;
+    }
   }
 
   Future<bool> registerFace(img.Image faceImage, String name) async {
-    print('→ Attempting to register face for: $name');
     List<double>? embedding = await getFaceEmbedding(faceImage);
 
     if (embedding == null) {
@@ -153,33 +220,36 @@ class FaceRecognitionService {
     return true;
   }
 
-  Future<Map<String, dynamic>?> recognizeFace(img.Image faceImage) async {
-    final task = Stopwatch()..start();
+  // OPTIMIZED: Fast recognition with minimal logging
+  Future<Map<String, dynamic>?> recognizeFace(
+    img.Image faceImage, {
+    bool verbose = false,
+  }) async {
     try {
-      print('\n========== RECOGNITION STARTED ==========');
+      if (verbose) print('\n========== RECOGNITION STARTED ==========');
+
       List<double>? embedding = await getFaceEmbedding(faceImage);
 
-      if (embedding == null || registeredFaces.isEmpty) {
-        print('✗ No embedding or no registered faces');
+      if (embedding == null) {
+        if (verbose) print('✗ No embedding generated');
         return null;
+      }
+
+      if (registeredFaces.isEmpty) {
+        if (verbose) print('✗ No registered faces');
+        return {
+          'name': 'No registered faces',
+          'confidence': 0.0,
+          'matched': false
+        };
       }
 
       double maxSimilarity = -1.0;
       int maxIndex = -1;
-      List<Map<String, dynamic>> allMatches = [];
 
-      print('\n--- Comparing with registered faces ---');
-      // Compare with all registered faces
+      // Fast comparison loop
       for (int i = 0; i < registeredFaces.length; i++) {
         double similarity = cosineSimilarity(embedding, registeredFaces[i]);
-
-        allMatches.add({
-          'name': registeredNames[i],
-          'similarity': similarity,
-        });
-
-        print(
-            '${i + 1}. ${registeredNames[i]}: ${(similarity * 100).toStringAsFixed(2)}%');
 
         if (similarity > maxSimilarity) {
           maxSimilarity = similarity;
@@ -187,20 +257,22 @@ class FaceRecognitionService {
         }
       }
 
-      print('\n--- Results ---');
-      print('Best match: ${registeredNames[maxIndex]}');
-      print('Similarity: ${(maxSimilarity * 100).toStringAsFixed(2)}%');
-      print('Threshold: ${(threshold * 100).toStringAsFixed(0)}%');
-      print(
-          'Match status: ${maxSimilarity > threshold ? "✓ MATCHED" : "✗ NOT MATCHED"}');
-      print('========== RECOGNITION ENDED ==========\n');
+      if (verbose) {
+        print('\n--- Results ---');
+        print('Best match: ${registeredNames[maxIndex]}');
+        print('Similarity: ${(maxSimilarity * 100).toStringAsFixed(2)}%');
+        print('Threshold: ${(threshold * 100).toStringAsFixed(0)}%');
+        print(
+            'Match status: ${maxSimilarity > threshold ? "✓ MATCHED" : "✗ NOT MATCHED"}');
+        print('========== RECOGNITION ENDED ==========\n');
+      }
 
       if (maxSimilarity > threshold) {
         return {
           'name': registeredNames[maxIndex],
           'confidence': maxSimilarity,
           'matched': true,
-          'allMatches': allMatches,
+          'index': maxIndex,
         };
       }
 
@@ -208,12 +280,21 @@ class FaceRecognitionService {
         'name': 'Unknown',
         'confidence': maxSimilarity,
         'matched': false,
-        'allMatches': allMatches,
+        'bestMatch': maxIndex >= 0 ? registeredNames[maxIndex] : null,
       };
-    } finally {
-      task.stop();
-      print(task.elapsed);
+    } catch (e) {
+      if (verbose) print('✗ Error in recognition: $e');
+      return null;
     }
+  }
+
+  // OPTIMIZED: Batch recognition for multiple faces
+  Future<List<Map<String, dynamic>?>> recognizeMultipleFaces(
+    List<img.Image> faceImages,
+  ) async {
+    return Future.wait(
+      faceImages.map((image) => recognizeFace(image, verbose: false)),
+    );
   }
 
   void clearRegisteredFaces() {
@@ -224,5 +305,33 @@ class FaceRecognitionService {
 
   void dispose() {
     interpreter?.close();
+    _inputBuffer = null;
+    _outputBuffer = null;
+  }
+
+  // Helper: Get all similarities for debugging
+  Future<List<Map<String, dynamic>>?> getAllSimilarities(
+    img.Image faceImage,
+  ) async {
+    List<double>? embedding = await getFaceEmbedding(faceImage);
+
+    if (embedding == null || registeredFaces.isEmpty) {
+      return null;
+    }
+
+    List<Map<String, dynamic>> results = [];
+    for (int i = 0; i < registeredFaces.length; i++) {
+      double similarity = cosineSimilarity(embedding, registeredFaces[i]);
+      results.add({
+        'name': registeredNames[i],
+        'similarity': similarity,
+        'percentage': (similarity * 100).toStringAsFixed(2),
+      });
+    }
+
+    // Sort by similarity descending
+    results.sort((a, b) =>
+        (b['similarity'] as double).compareTo(a['similarity'] as double));
+    return results;
   }
 }
