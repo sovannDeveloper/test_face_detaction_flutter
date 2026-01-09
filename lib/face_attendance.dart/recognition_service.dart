@@ -1,4 +1,3 @@
-
 part of 'main.dart';
 
 class FaceRecognitionService {
@@ -146,15 +145,14 @@ class FaceRecognitionService {
       List<List<double>> registerFaces0 = [];
       List<String> registeredNames0 = [];
 
-      print('Loading ${images.length} face(s) for registration...');
-
       for (int i = 0; i < images.length; i++) {
         try {
           final e = images[i];
-          final bytes = await File(e.path).readAsBytes();
+          final file = File(e.path);
+          final bytes = file.readAsBytesSync();
           final faceImage = img.decodeImage(bytes);
 
-          if (faceImage == null) {
+          if (faceImage == null || !file.existsSync()) {
             print('Failed to decode image: ${e.path}');
             continue;
           }
@@ -177,6 +175,8 @@ class FaceRecognitionService {
           continue;
         }
       }
+
+      print('Image: ${registerFaces0.length}');
 
       registeredFaces = registerFaces0;
       registeredNames = registeredNames0;

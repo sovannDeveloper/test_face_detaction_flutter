@@ -1,25 +1,36 @@
 part of 'main.dart';
 
 class FaceData {
-  final List<Face> faces;
+  final Face face;
   final Size imageSize;
+  final bool isVerify;
+  final BlinkEvent? blinkEvent;
 
-  FaceData({this.faces = const [], this.imageSize = Size.zero});
+  FaceData({
+    required this.face,
+    this.blinkEvent,
+    this.isVerify = false,
+    this.imageSize = Size.zero,
+  });
 }
 
 class FaceDetectionService {
-  final onDetection = StreamController<FaceData>.broadcast();
-  final onRecognize = StreamController.broadcast();
-
+  final onDetection = StreamController<FaceData?>.broadcast();
   late InputImageRotation _rotation;
+  late final _blinkDetector = AdvancedBlinkDetector();
   final faceRecognition = FaceRecognitionService();
   bool _isDetecting = false;
   int _frameCount = 0;
   bool _isRecognizing = false;
+  int _id = 0;
+  bool _isVerify = false;
+  BlinkEvent? _blinkEvent;
+
   final detector = FaceDetector(
     options: FaceDetectorOptions(
       enableClassification: true,
       enableLandmarks: true,
+      enableTracking: true,
       performanceMode: FaceDetectorMode.accurate,
     ),
   );
@@ -60,9 +71,34 @@ class FaceDetectionService {
 
       final faces = await detector.processImage(inputImage);
 
-      onDetection.add(FaceData(faces: faces, imageSize: rotatedImageSize));
+      if (faces.isNotEmpty) {
+        final trackingId = faces.first.trackingId ?? 0;
 
-      _performRecognitionAsync(image, _rotation);
+        if (trackingId != _id) {
+          _isVerify = false;
+          _id = trackingId;
+          _blinkEvent = null;
+          _blinkDetector.resetCalibration();
+        }
+
+        // Verify eyes
+        if (_isVerify && _blinkEvent?.type != BlinkType.bothEyes) {
+          final event = _blinkDetector.processFrame(faces.first);
+
+          _blinkEvent = event;
+        }
+
+        onDetection.add(FaceData(
+          face: faces.first,
+          imageSize: rotatedImageSize,
+          isVerify: _isVerify,
+          blinkEvent: _blinkEvent,
+        ));
+
+        if (_frameCount % 20 == 0) {
+          _performRecognitionAsync(image, _rotation);
+        }
+      }
     } catch (e) {
       print('Error processing image: $e');
     } finally {
@@ -72,7 +108,7 @@ class FaceDetectionService {
 
   Future<void> _performRecognitionAsync(
       CameraImage image, InputImageRotation rotation) async {
-    if (_isRecognizing) return;
+    if (_isRecognizing || _isVerify) return;
 
     _isRecognizing = true;
 
@@ -86,7 +122,8 @@ class FaceDetectionService {
 
       if (recognize != null && recognize['confidence'] != null) {
         final confidencePercent = (recognize['confidence'] * 100).round();
-        onRecognize.add('$confidencePercent');
+
+        _isVerify = confidencePercent > 50;
       }
     } catch (e) {
       print('Error in async recognition: $e');
@@ -130,7 +167,7 @@ class FaceDetectionService {
     }
   }
 
-  Rect scaleRect({
+  static Rect scaleRect({
     required Rect rect,
     required Size size,
     required Size widgetSize,
@@ -162,6 +199,5 @@ class FaceDetectionService {
   void dispose() {
     detector.close();
     onDetection.close();
-    onRecognize.close();
   }
 }

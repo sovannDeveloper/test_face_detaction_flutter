@@ -6,7 +6,7 @@ import 'package:image/image.dart' as img;
 import 'package:test_face_detaction/img_util.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 
-class FaceRecognitionService {
+class FaceRecognitionService0 {
   static Interpreter? interpreter;
   static List<List<double>> registeredFaces = [];
   static List<String> registeredNames = [];

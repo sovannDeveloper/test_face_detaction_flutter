@@ -18,7 +18,7 @@ class FaceRecognitionScreen extends StatefulWidget {
 }
 
 class _FaceRecognitionScreenState extends State<FaceRecognitionScreen> {
-  final FaceRecognitionService _faceService = FaceRecognitionService();
+  final FaceRecognitionService0 _faceService = FaceRecognitionService0();
   final ImagePicker _picker = ImagePicker();
 
   File? _selectedImage;

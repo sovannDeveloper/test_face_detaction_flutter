@@ -1,145 +1,107 @@
 part of 'main.dart';
 
 class FacePainter extends CustomPainter {
-  final List<Face> faces;
-  final Size videoSize;
+  final Face face;
+  final Size imageSize;
+  final bool isVerify;
 
-  FacePainter(this.faces, this.videoSize);
+  FacePainter(this.face, this.imageSize, this.isVerify);
 
   @override
   void paint(Canvas canvas, Size size) {
+    Color color = const Color.fromARGB(255, 255, 0, 0);
+
+    if (isVerify) {
+      color = const Color.fromARGB(255, 0, 255, 102);
+    }
+
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
-      ..color = const Color.fromARGB(255, 255, 0, 0);
+      ..color = color
+      ..strokeCap = StrokeCap.round;
 
-    for (int i = 0; i < faces.length; i++) {
-      final face = faces[i];
-      final rect = _scaleRect(
-        rect: face.boundingBox,
-        videoSize: videoSize,
-        widgetSize: size,
-      );
+    final rect = FaceDetectionService.scaleRect(
+        rect: face.boundingBox, size: imageSize, widgetSize: size);
 
-      // Draw rectangle
-      canvas.drawRect(rect, paint);
+    // Draw corner brackets instead of full rectangle
+    final cornerLength = rect.width * 0.2; // 20% of width for corner length
 
-      // Draw text label
-      _drawText(
-        canvas: canvas,
-        text: 'Unknown ${i + 1}',
-        position: Offset(rect.left - 1, rect.top - 20),
-        backgroundColor: const Color.fromARGB(255, 255, 0, 0),
-      );
+    // Top-left corner
+    canvas.drawLine(
+        rect.topLeft, Offset(rect.left + cornerLength, rect.top), paint);
+    canvas.drawLine(
+        rect.topLeft, Offset(rect.left, rect.top + cornerLength), paint);
 
-      // Draw smile probability if available
-      if (face.smilingProbability != null) {
-        _drawText(
-          canvas: canvas,
-          text:
-              'Smile: ${(face.smilingProbability! * 100).toStringAsFixed(0)}%',
-          position: Offset(rect.left - 1, rect.bottom + 1),
-          backgroundColor: Colors.blue,
-        );
-      }
+    // Top-right corner
+    canvas.drawLine(Offset(rect.right, rect.top),
+        Offset(rect.right - cornerLength, rect.top), paint);
+    canvas.drawLine(Offset(rect.right, rect.top),
+        Offset(rect.right, rect.top + cornerLength), paint);
 
-      // Draw eye open probabilities
-      if (face.leftEyeOpenProbability != null ||
-          face.rightEyeOpenProbability != null) {
-        String eyeText = '';
-        if (face.leftEyeOpenProbability != null) {
-          eyeText +=
-              'L: ${(face.leftEyeOpenProbability! * 100).toStringAsFixed(0)}%';
-        }
-        if (face.rightEyeOpenProbability != null) {
-          if (eyeText.isNotEmpty) eyeText += ' ';
-          eyeText +=
-              'R: ${(face.rightEyeOpenProbability! * 100).toStringAsFixed(0)}%';
-        }
+    // Bottom-left corner
+    canvas.drawLine(Offset(rect.left, rect.bottom),
+        Offset(rect.left + cornerLength, rect.bottom), paint);
+    canvas.drawLine(Offset(rect.left, rect.bottom),
+        Offset(rect.left, rect.bottom - cornerLength), paint);
 
-        _drawText(
-          canvas: canvas,
-          text: eyeText,
-          position: Offset(rect.left - 1, rect.bottom + 20),
-          backgroundColor: Colors.orange,
-        );
-      }
-
-      paint.style = PaintingStyle.stroke;
-    }
-  }
-
-  void _drawText({
-    required Canvas canvas,
-    required String text,
-    required Offset position,
-    required Color backgroundColor,
-    Color textColor = Colors.white,
-    double fontSize = 14,
-  }) {
-    final textSpan = TextSpan(
-      text: text,
-      style: TextStyle(
-        color: textColor,
-        fontSize: fontSize,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-
-    final textPainter = TextPainter(
-      text: textSpan,
-      textDirection: TextDirection.ltr,
-    );
-
-    textPainter.layout();
-
-    // Draw background
-    final backgroundRect = Rect.fromLTWH(
-      position.dx,
-      position.dy,
-      textPainter.width + 8,
-      textPainter.height + 4,
-    );
-
-    final backgroundPaint = Paint()
-      ..color = backgroundColor.withOpacity(0.8)
-      ..style = PaintingStyle.fill;
-
-    canvas.drawRect(backgroundRect, backgroundPaint);
-
-    // Draw text
-    textPainter.paint(canvas, position + const Offset(4, 2));
-  }
-
-  Rect _scaleRect({
-    required Rect rect,
-    required Size videoSize,
-    required Size widgetSize,
-  }) {
-    final double scaleX = widgetSize.width / videoSize.width;
-    final double scaleY = widgetSize.height / videoSize.height;
-    final double scale = scaleX < scaleY ? scaleX : scaleY;
-
-    // Calculate centered position offsets
-    final double scaledWidth = videoSize.width * scale;
-    final double scaledHeight = videoSize.height * scale;
-    final double offsetX = (widgetSize.width - scaledWidth) / 2;
-    final double offsetY = (widgetSize.height - scaledHeight) / 2;
-
-    // Scale the rectangle
-    double left = rect.left * scale + offsetX;
-    double top = rect.top * scale + offsetY;
-    double right = rect.right * scale + offsetX;
-    double bottom = rect.bottom * scale + offsetY;
-
-    return Rect.fromLTRB(
-      left.clamp(0, left),
-      top.clamp(0, top),
-      right.clamp(0, right),
-      bottom.clamp(0, bottom),
-    );
+    // Bottom-right corner
+    canvas.drawLine(Offset(rect.right, rect.bottom),
+        Offset(rect.right - cornerLength, rect.bottom), paint);
+    canvas.drawLine(Offset(rect.right, rect.bottom),
+        Offset(rect.right, rect.bottom - cornerLength), paint);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class Group6Painter extends CustomPainter {
+  final Color backgroundColor;
+  final Color activeColor;
+
+  Group6Painter(this.backgroundColor, this.activeColor);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double scaleX = size.width / 391;
+    final double scaleY = size.height / 391;
+
+    canvas.save();
+    canvas.scale(scaleX, scaleY);
+
+    /// 1. Background square with circular hole
+    final backgroundPaint = Paint()
+      ..color = backgroundColor
+      ..style = PaintingStyle.fill;
+
+    final path = Path()
+      ..fillType = PathFillType.evenOdd
+      // outer rectangle
+      ..addRect(const Rect.fromLTWH(0, 0, 391, 391))
+      // inner circular hole
+      ..addOval(Rect.fromCircle(
+        center: const Offset(196, 196),
+        radius: 133,
+      ));
+
+    canvas.drawPath(path, backgroundPaint);
+
+    /// 2. Red stroked circle
+    final circlePaint = Paint()
+      ..color = activeColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5;
+
+    canvas.drawCircle(
+      const Offset(196, 196),
+      135.5,
+      circlePaint,
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

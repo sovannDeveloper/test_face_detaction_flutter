@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-import 'dart:ui';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -14,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 
 part 'detection_service.dart';
+part 'eye_blink.dart';
 part 'image_util.dart';
 part 'recognition_service.dart';
 part 'screen.dart';

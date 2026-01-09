@@ -15,8 +15,8 @@ class FaceDetectionPage extends StatefulWidget {
 }
 
 class _FaceDetectionPageState extends State<FaceDetectionPage> {
-  final _faceRecognitionService = FaceRecognitionService();
-  late final _faceDetection = FaceDetectionService(MediaQuery.of(context).size);
+  final _faceRecognitionService = FaceRecognitionService0();
+  late final _faceDetection = FaceDetectionService0(MediaQuery.of(context).size);
 
   @override
   void dispose() {

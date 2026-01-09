@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 
+import 'face_attendance.dart/main.dart';
 import 'services/face_recognition_service.dart';
 
 class CameraRecognitionScreen extends StatefulWidget {

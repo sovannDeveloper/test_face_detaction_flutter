@@ -3,7 +3,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 import 'services/face_detection_service.dart';
 
-Widget buildInfo(FaceDetectionService faceDetection) => Positioned(
+Widget buildInfo(FaceDetectionService0 faceDetection) => Positioned(
       top: 20,
       left: 20,
       right: 20,

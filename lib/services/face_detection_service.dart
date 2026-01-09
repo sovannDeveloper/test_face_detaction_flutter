@@ -22,7 +22,7 @@ class FaceData {
   });
 }
 
-class FaceDetectionService {
+class FaceDetectionService0{
   late CameraDescription _camera = cameras.first;
   final onDetection = StreamController<FaceData>.broadcast();
   final onRecognize = StreamController.broadcast();
@@ -30,7 +30,7 @@ class FaceDetectionService {
 
   late Size screenSize;
 
-  FaceDetectionService([Size? screenSize0]) {
+  FaceDetectionService0([Size? screenSize0]) {
     screenSize = screenSize0 ?? Size.zero;
     cameraState.add(CameraState.none);
     _camera = cameras.firstWhere(
@@ -39,7 +39,7 @@ class FaceDetectionService {
     _initCamera(_camera);
   }
 
-  final faceRecognition = FaceRecognitionService();
+  final faceRecognition = FaceRecognitionService0();
   static List<CameraDescription> _cameras = [];
   bool _isDetecting = false;
   int _frameCount = 0;
