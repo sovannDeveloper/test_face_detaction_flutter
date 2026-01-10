@@ -12,10 +12,14 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 
+part 'blink_detector.dart';
 part 'detection_service.dart';
+part 'detection_v2.dart';
 part 'eye_blink.dart';
+part 'func.dart';
 part 'image_util.dart';
 part 'recognition_service.dart';
+part 'recognition_v2.dart';
 part 'screen.dart';
 part 'storage_util.dart';
 part 'widget.dart';

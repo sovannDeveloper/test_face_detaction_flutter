@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'face_attendance.dart/main.dart';
+import 'face_detection_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,11 +45,16 @@ class _MyMainScreenState extends State<MyMainScreen> {
             children: [
               ElevatedButton(
                   onPressed: () async {
+                    _go(const FaceDetectionPage());
+                  },
+                  child: const Text('Face detection')),
+              ElevatedButton(
+                  onPressed: () async {
                     await FaceRecognitionService.loadRegisterFaces();
                     _go(const FaceScreen());
                   },
                   child: const Text('Go to face detection')),
-              Divider(),
+              const Divider(),
               ElevatedButton(
                   onPressed: () async {
                     final img = await ImageStorageUtil.pickFromGallery();
