@@ -2,15 +2,72 @@
 
 A new Flutter project.
 
-## Getting Started
+## 2. Modify Your `ios/Podfile`
 
-This project is a starting point for a Flutter application.
+Inside the target `Runner` do block, add the native C API pod:
 
-A few resources to get you started if this is your first Flutter project:
+```ruby
+pod 'TensorFlowLiteC'
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Your `Podfile` should look like this:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```ruby
+platform :ios, '16.0'
+
+target 'Runner' do
+  use_frameworks!
+
+  flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
+
+  # Native TensorFlow Lite C API
+  pod 'TensorFlowLiteC'
+
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+
+    # Ensure deployment target is respected
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
+    end
+  end
+end
+```
+
+---
+
+## 3. Set Strip Style in Xcode (**Critical**)
+
+This is required to prevent iOS from removing needed native symbols during release builds.
+
+1. Open `ios/Runner.xcworkspace` in Xcode  
+2. Select **Runner project** → **Build Settings**  
+3. Search for **Strip Style**  
+4. Change:
+
+```
+All Symbols → Non-Global Symbols
+```
+
+---
+
+## 4. Clean and Rebuild
+
+```bash
+flutter clean
+flutter pub get
+
+cd ios
+rm -rf Pods Podfile.lock
+pod install
+cd ..
+
+flutter build ios --release
+```
+

@@ -1,15 +1,40 @@
 part of 'main.dart';
 
 class FaceRecognitionV2 {
+  final _onRecognition = StreamController<Map<String, dynamic>?>.broadcast();
+  static final onLoad = StreamController<String?>.broadcast();
   static Interpreter? interpreter;
   static List<List<double>> registeredFaces = [];
-  static List<String> registeredNames = [];
   static const int inputSize = 112;
   static const int outputSize = 192;
   static Float32List? _inputBuffer;
   static Float32List? _outputBuffer;
+  late InputImageRotation _rotation;
+  bool _isRecognizing = false;
+  bool _isVerify = false;
+  int _frameCount = 0;
+
+  bool get isVerify => _isVerify;
+
+  void reset() {
+    _isVerify = false;
+  }
 
   double threshold = 0.5;
+
+  Stream<Map<String, dynamic>?> get stream => _onRecognition.stream;
+
+  void initCameraRotation(CameraDescription camera) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      if (camera.lensDirection == CameraLensDirection.front) {
+        _rotation = InputImageRotation.rotation270deg;
+      } else {
+        _rotation = InputImageRotation.rotation90deg;
+      }
+    } else {
+      _rotation = InputImageRotation.rotation0deg;
+    }
+  }
 
   void setThreshold(double newThreshold) {
     threshold = newThreshold;
@@ -17,25 +42,21 @@ class FaceRecognitionV2 {
 
   static Future<void> loadModel() async {
     try {
-      final options = InterpreterOptions()
-        ..threads = 4
-        ..useNnApiForAndroid = true;
-      interpreter = await Interpreter.fromAsset(
-        'assets/models/mobilefacenet.tflite',
-        options: options,
-      );
-
+      onLoad.add('Loading model');
+      final options = InterpreterOptions()..threads = 4;
+      interpreter =
+          await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
       _inputBuffer = Float32List(1 * inputSize * inputSize * 3);
       _outputBuffer = Float32List(outputSize);
-      print('✓ Buffers pre-allocated');
+      onLoad.add('Successful loaded');
     } catch (e) {
       print('✗ Error loading model: $e');
+      onLoad.add('Error: $e');
       rethrow;
     }
   }
 
   static Float32List preprocessImageOptimized(img.Image image) {
-    // Resize image
     img.Image resizedImage = img.copyResize(
       image,
       width: inputSize,
@@ -104,99 +125,102 @@ class FaceRecognitionV2 {
     return dotProduct;
   }
 
-  static Future<void> loadRegisterFaces({
-    Function(int current, int total)? onProgress,
-  }) async {
-    try {
-      final images = await ImageStorageUtil.loadAllImages();
+  Future<void> processCameraImage(CameraImage image) async {
+    if (_isRecognizing || _isVerify) return;
 
-      if (images.isEmpty) {
-        print('No images found to register');
-        registeredFaces = [];
-        registeredNames = [];
+    _isRecognizing = true;
+
+    try {
+      _frameCount++;
+
+      if (_frameCount % 10 != 0) {
+        _isRecognizing = false;
         return;
       }
 
-      List<List<double>> registerFaces0 = [];
-      List<String> registeredNames0 = [];
+      final convertedImage =
+          ImageUtil.convertCameraImageToImgWithRotation(image, _rotation);
 
-      for (int i = 0; i < images.length; i++) {
-        try {
-          final e = images[i];
-          final file = File(e.path);
-          final bytes = file.readAsBytesSync();
-          final faceImage = img.decodeImage(bytes);
+      if (convertedImage == null) return;
 
-          if (faceImage == null || !file.existsSync()) {
-            print('Failed to decode image: ${e.path}');
-            continue;
-          }
+      final recognize = await recognizeFace(convertedImage);
 
-          final embedding = await getFaceEmbedding(faceImage);
+      _onRecognition.add(recognize);
 
-          if (embedding == null) {
-            print('No face detected in image: ${e.path}');
-            continue;
-          }
+      if (recognize != null && recognize['confidence'] != null) {
+        final confidencePercent = (recognize['confidence'] * 100).round();
 
-          registerFaces0.add(embedding);
-          final name = _extractNameFromPath(e.path) ?? 'User ${i + 1}';
-          registeredNames0.add(name);
+        // _isVerify = confidencePercent > 50;
+      }
+    } catch (e) {
+      print('Error in async recognition: $e');
+    } finally {
+      _isRecognizing = false;
+    }
+  }
 
-          onProgress?.call(i + 1, images.length);
-          print('Registered face ${i + 1}/${images.length}: $name');
-        } catch (e) {
-          print('Error processing image at index $i: $e');
+  static Future<(bool, String?)> loadRegisterFaces(
+    List<File> files, {
+    Function(int current, int total)? onProgress,
+  }) async {
+    if (files.isEmpty || interpreter == null) {
+      registeredFaces.clear();
+      return (false, 'File: ${files.length} or Model not loaded');
+    }
+
+    List<List<double>> registerFaces0 = [];
+    List<String> error = ['Model: ${interpreter != null}'];
+    String errorToText() => error.join(', ');
+
+    for (int i = 0; i < files.length; i++) {
+      try {
+        final e = files[i];
+        final file = File(e.path);
+        final bytes = file.readAsBytesSync();
+        final faceImage = img.decodeImage(bytes);
+
+        error.add('$i-Exist: ${file.existsSync()}');
+
+        if (faceImage == null || !file.existsSync()) {
           continue;
         }
+
+        final embedding = await getFaceEmbedding(faceImage);
+
+        error.add('$i-Embedding: ${embedding != null}');
+
+        if (embedding == null) {
+          continue;
+        }
+
+        registerFaces0.add(embedding);
+
+        onProgress?.call(i + 1, files.length);
+      } catch (e) {
+        print('Error processing image at index $i: $e');
+        error.add('$i-Error: $e');
+        continue;
       }
-
-      registeredFaces = registerFaces0;
-      registeredNames = registeredNames0;
-    } catch (e) {
-      print('Error loading registered faces: $e');
-      registeredFaces = [];
-      registeredNames = [];
     }
+
+    registeredFaces = registerFaces0;
+
+    if (registeredFaces.isEmpty) {
+      return (false, errorToText());
+    }
+
+    return (true, errorToText());
   }
 
-  static String? _extractNameFromPath(String path) {
+  Future<Map<String, dynamic>?> recognizeFace(img.Image faceImage) async {
     try {
-      final fileName = path.split('/').last.split('.').first;
-      return fileName.replaceAll('_', ' ').replaceAll('-', ' ').trim();
-    } catch (e) {
-      return null;
-    }
-  }
-
-  Future<bool> registerFace(img.Image faceImage, String name) async {
-    List<double>? embedding = await getFaceEmbedding(faceImage);
-
-    if (embedding == null) {
-      return false;
-    }
-
-    registeredFaces.add(embedding);
-    registeredNames.add(name);
-    return true;
-  }
-
-  Future<Map<String, dynamic>?> recognizeFace(
-    img.Image faceImage, {
-    bool verbose = false,
-  }) async {
-    try {
-      if (verbose) print('\n========== RECOGNITION STARTED ==========');
-
       List<double>? embedding = await getFaceEmbedding(faceImage);
 
       if (embedding == null) {
-        if (verbose) print('✗ No embedding generated');
         return null;
       }
 
       if (registeredFaces.isEmpty) {
-        if (verbose) print('✗ No registered faces');
         return {
           'name': 'No registered faces',
           'confidence': 0.0,
@@ -207,7 +231,6 @@ class FaceRecognitionV2 {
       double maxSimilarity = -1.0;
       int maxIndex = -1;
 
-      // Fast comparison loop
       for (int i = 0; i < registeredFaces.length; i++) {
         double similarity = cosineSimilarity(embedding, registeredFaces[i]);
 
@@ -217,19 +240,8 @@ class FaceRecognitionV2 {
         }
       }
 
-      if (verbose) {
-        print('\n--- Results ---');
-        print('Best match: ${registeredNames[maxIndex]}');
-        print('Similarity: ${(maxSimilarity * 100).toStringAsFixed(2)}%');
-        print('Threshold: ${(threshold * 100).toStringAsFixed(0)}%');
-        print(
-            'Match status: ${maxSimilarity > threshold ? "✓ MATCHED" : "✗ NOT MATCHED"}');
-        print('========== RECOGNITION ENDED ==========\n');
-      }
-
       if (maxSimilarity > threshold) {
         return {
-          'name': registeredNames[maxIndex],
           'confidence': maxSimilarity,
           'matched': true,
           'index': maxIndex,
@@ -240,10 +252,10 @@ class FaceRecognitionV2 {
         'name': 'Unknown',
         'confidence': maxSimilarity,
         'matched': false,
-        'bestMatch': maxIndex >= 0 ? registeredNames[maxIndex] : null,
+        'bestMatch': maxIndex >= 0 ? '' : null,
       };
     } catch (e) {
-      if (verbose) print('✗ Error in recognition: $e');
+      print('✗ Error in recognition: $e');
       return null;
     }
   }
@@ -251,21 +263,15 @@ class FaceRecognitionV2 {
   Future<List<Map<String, dynamic>?>> recognizeMultipleFaces(
     List<img.Image> faceImages,
   ) async {
-    return Future.wait(
-      faceImages.map((image) => recognizeFace(image, verbose: false)),
-    );
+    return Future.wait(faceImages.map((image) => recognizeFace(image)));
   }
 
   void clearRegisteredFaces() {
     registeredFaces.clear();
-    registeredNames.clear();
-    print('✓ All registered faces cleared');
   }
 
   void dispose() {
-    interpreter?.close();
-    _inputBuffer = null;
-    _outputBuffer = null;
+    _onRecognition.close();
   }
 
   Future<List<Map<String, dynamic>>?> getAllSimilarities(
@@ -281,7 +287,6 @@ class FaceRecognitionV2 {
     for (int i = 0; i < registeredFaces.length; i++) {
       double similarity = cosineSimilarity(embedding, registeredFaces[i]);
       results.add({
-        'name': registeredNames[i],
         'similarity': similarity,
         'percentage': (similarity * 100).toStringAsFixed(2),
       });
@@ -290,5 +295,13 @@ class FaceRecognitionV2 {
     results.sort((a, b) =>
         (b['similarity'] as double).compareTo(a['similarity'] as double));
     return results;
+  }
+
+  static Future<img.Image> loadImageFromFile(String filePath) async {
+    final imageFile = File(filePath);
+    final bytes = await imageFile.readAsBytes();
+
+    img.Image image = img.decodeImage(Uint8List.fromList(bytes))!;
+    return image;
   }
 }

@@ -17,15 +17,13 @@ class FacePainter extends CustomPainter {
 
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
+      ..strokeWidth = 1.5
       ..color = color
       ..strokeCap = StrokeCap.round;
 
     final rect = FaceDetectionService.scaleRect(
         rect: face.boundingBox, size: imageSize, widgetSize: size);
-
-    // Draw corner brackets instead of full rectangle
-    final cornerLength = rect.width * 0.2; // 20% of width for corner length
+    final cornerLength = rect.width * 0.1;
 
     // Top-left corner
     canvas.drawLine(

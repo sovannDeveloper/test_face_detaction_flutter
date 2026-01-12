@@ -129,6 +129,7 @@ DEPENDENCIES:
   - google_mlkit_object_detection (from `.symlinks/plugins/google_mlkit_object_detection/ios`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
+  - TensorFlowLiteC
   - tflite_flutter (from `.symlinks/plugins/tflite_flutter/ios`)
   - video_player_avfoundation (from `.symlinks/plugins/video_player_avfoundation/darwin`)
 
@@ -205,6 +206,6 @@ SPEC CHECKSUMS:
   tflite_flutter: 9433d086a3060431bbc9f3c7c20d017db0e72d08
   video_player_avfoundation: 7c6c11d8470e1675df7397027218274b6d2360b3
 
-PODFILE CHECKSUM: 819463e6a0290f5a72f145ba7cde16e8b6ef0796
+PODFILE CHECKSUM: e5ea40e3b6d02bffba0f96edec231273d628044d
 
 COCOAPODS: 1.15.2
