@@ -63,7 +63,7 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
                     builder: (_, s) {
                       final face = getSingleFace(s.data);
 
-                      if (face?.trackingId != _trackingId) {
+                      if (face == null || face.trackingId != _trackingId) {
                         _trackingId = face?.trackingId ?? 0;
                         Future.microtask(_recognition.reset);
                       }
