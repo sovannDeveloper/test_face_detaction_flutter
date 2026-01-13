@@ -256,27 +256,25 @@ class _LiveCameraPageState extends State<LiveCameraPage> {
                                       ));
                                 })),
                         Positioned(
-                          top: 16,
-                          left: 16,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              'Faces: ${faces.length}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
+                            right: 10,
+                            left: 10,
+                            top: 10,
+                            child: StreamBuilder(
+                                stream: _detector.stream,
+                                builder: (_, s) {
+                                  final faces = s.data ?? [];
+
+                                  if (faces.isEmpty) return const SizedBox();
+
+                                  return Parent(
+                                      style: ParentStyle()
+                                        ..background.color(Colors.black54)
+                                        ..padding(all: 16),
+                                      child: Text(
+                                        '${faces.first.boundingBox.width}',
+                                        style: TextStyle(color: Colors.white),
+                                      ));
+                                })),
                       ],
                     );
                   });

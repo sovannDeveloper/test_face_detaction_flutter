@@ -17,6 +17,7 @@ part 'blink_detector.dart';
 part 'detection_service.dart';
 part 'detection_v2.dart';
 part 'eye_blink.dart';
+part 'face_distance.dart';
 part 'func.dart';
 part 'image_util.dart';
 part 'recognition_service.dart';

@@ -150,7 +150,7 @@ class FaceRecognitionV2 {
       if (recognize != null && recognize['confidence'] != null) {
         final confidencePercent = (recognize['confidence'] * 100).round();
 
-        // _isVerify = confidencePercent > 50;
+        _isVerify = confidencePercent > 50;
       }
     } catch (e) {
       print('Error in async recognition: $e');
