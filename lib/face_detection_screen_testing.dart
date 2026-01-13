@@ -15,8 +15,8 @@ class FaceDetectionPage extends StatefulWidget {
 }
 
 class _FaceDetectionPageState extends State<FaceDetectionPage> {
-  late final _faceDetection = FaceDetectionServiceV2();
-  final _recognition = FaceRecognitionV2();
+  late final _faceDetection = FaceDetectionService();
+  final _recognition = FaceRecognitionService();
   File? _selectedImage;
   bool _isProcessing = false;
   String? _errorMessage;
@@ -71,7 +71,7 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => LiveCameraPage(
+        builder: (context) => LiveDetectionScreen(
             camera: _camera!,
             recognition: _recognition,
             detection: _faceDetection),
@@ -145,8 +145,9 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
                 onPressed: () async {
                   if (_selectedImage == null) return;
 
-                  final faceImage = await FaceRecognitionV2.loadImageFromFile(
-                      _selectedImage!.path);
+                  final faceImage =
+                      await FaceRecognitionService.loadImageFromFile(
+                          _selectedImage!.path);
                   final result = await _recognition.recognizeFace(faceImage);
 
                   _resultText = '$result';
@@ -156,132 +157,6 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
                 label: const Text('Recognition'),
               ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class LiveCameraPage extends StatefulWidget {
-  final CameraDescription camera;
-  final FaceRecognitionV2 recognition;
-  final FaceDetectionServiceV2 detection;
-
-  const LiveCameraPage({
-    super.key,
-    required this.camera,
-    required this.detection,
-    required this.recognition,
-  });
-
-  @override
-  State<LiveCameraPage> createState() => _LiveCameraPageState();
-}
-
-class _LiveCameraPageState extends State<LiveCameraPage> {
-  late final _detector = widget.detection;
-  late final _recognition = widget.recognition..reset();
-  late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = CameraController(
-      widget.camera,
-      ResolutionPreset.high,
-      enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.nv21,
-    );
-
-    _initializeControllerFuture = _controller.initialize().then((_) {
-      _controller.startImageStream((image) {
-        _detector.processCameraImage(image);
-        _recognition.processCameraImage(image);
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Live Face Detection'),
-          backgroundColor: Colors.blue,
-        ),
-        body: FutureBuilder<void>(
-          future: _initializeControllerFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.done) {
-              return StreamBuilder(
-                  stream: _detector.stream,
-                  builder: (_, s) {
-                    final faces = s.data ?? [];
-
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CameraPreview(_controller),
-                        if (faces.isNotEmpty)
-                          CustomPaint(
-                            painter: FacePainter(
-                                faces.first,
-                                Size(
-                                  _controller.value.previewSize!.height,
-                                  _controller.value.previewSize!.width,
-                                ),
-                                true),
-                          ),
-                        Positioned(
-                            right: 10,
-                            left: 10,
-                            bottom: 10,
-                            child: StreamBuilder(
-                                stream: _recognition.stream,
-                                builder: (_, s) {
-                                  return Parent(
-                                      style: ParentStyle()
-                                        ..background.color(Colors.black54)
-                                        ..padding(all: 16),
-                                      child: Text(
-                                        '${s.data}',
-                                        style: TextStyle(color: Colors.white),
-                                      ));
-                                })),
-                        Positioned(
-                            right: 10,
-                            left: 10,
-                            top: 10,
-                            child: StreamBuilder(
-                                stream: _detector.stream,
-                                builder: (_, s) {
-                                  final faces = s.data ?? [];
-
-                                  if (faces.isEmpty) return const SizedBox();
-
-                                  return Parent(
-                                      style: ParentStyle()
-                                        ..background.color(Colors.black54)
-                                        ..padding(all: 16),
-                                      child: Text(
-                                        '${faces.first.boundingBox.width}',
-                                        style: TextStyle(color: Colors.white),
-                                      ));
-                                })),
-                      ],
-                    );
-                  });
-            } else {
-              return const Center(child: CircularProgressIndicator());
-            }
-          },
         ),
       ),
     );

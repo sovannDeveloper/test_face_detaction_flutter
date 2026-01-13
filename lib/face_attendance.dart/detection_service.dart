@@ -1,39 +1,23 @@
 part of 'main.dart';
 
-class FaceData {
-  final Face face;
-  final Size imageSize;
-  final bool isVerify;
-  final BlinkEvent? blinkEvent;
-
-  FaceData({
-    required this.face,
-    this.blinkEvent,
-    this.isVerify = false,
-    this.imageSize = Size.zero,
-  });
-}
-
 class FaceDetectionService {
-  final onDetection = StreamController<FaceData?>.broadcast();
+  final _detectionStream = StreamController<List<Face>>.broadcast();
   late InputImageRotation _rotation;
-  late final _blinkDetector = AdvancedBlinkDetector();
-  final faceRecognition = FaceRecognitionService();
   bool _isDetecting = false;
   int _frameCount = 0;
-  bool _isRecognizing = false;
-  int _id = 0;
-  bool _isVerify = false;
-  BlinkEvent? _blinkEvent;
 
-  final detector = FaceDetector(
+  final _detector = FaceDetector(
     options: FaceDetectorOptions(
+      enableLandmarks: false,
+      enableContours: true,
       enableClassification: true,
-      enableLandmarks: true,
       enableTracking: true,
-      performanceMode: FaceDetectorMode.accurate,
+      minFaceSize: 0.15,
+      performanceMode: FaceDetectorMode.fast,
     ),
   );
+
+  Stream<List<Face>> get stream => _detectionStream.stream;
 
   void processCameraImage(CameraImage image) async {
     if (_isDetecting) return;
@@ -54,11 +38,6 @@ class FaceDetectionService {
         image.height.toDouble(),
       );
 
-      final rotatedImageSize = _rotation == InputImageRotation.rotation90deg ||
-              _rotation == InputImageRotation.rotation270deg
-          ? Size(originalImageSize.height, originalImageSize.width)
-          : originalImageSize;
-
       final inputImage = InputImage.fromBytes(
         bytes: _concatenatePlanes(image.planes),
         metadata: InputImageMetadata(
@@ -69,66 +48,13 @@ class FaceDetectionService {
         ),
       );
 
-      final faces = await detector.processImage(inputImage);
+      final faces = await _detector.processImage(inputImage);
 
-      if (faces.isNotEmpty) {
-        final trackingId = faces.first.trackingId ?? 0;
-
-        if (trackingId != _id) {
-          _isVerify = false;
-          _id = trackingId;
-          _blinkEvent = null;
-          _blinkDetector.resetCalibration();
-        }
-
-        // Verify eyes
-        if (_isVerify && _blinkEvent?.type != BlinkType.bothEyes) {
-          final event = _blinkDetector.processFrame(faces.first);
-
-          _blinkEvent = event;
-        }
-
-        onDetection.add(FaceData(
-          face: faces.first,
-          imageSize: rotatedImageSize,
-          isVerify: _isVerify,
-          blinkEvent: _blinkEvent,
-        ));
-
-        if (_frameCount % 20 == 0) {
-          _performRecognitionAsync(image, _rotation);
-        }
-      }
+      _detectionStream.add(faces);
     } catch (e) {
       print('Error processing image: $e');
     } finally {
       _isDetecting = false;
-    }
-  }
-
-  Future<void> _performRecognitionAsync(
-      CameraImage image, InputImageRotation rotation) async {
-    if (_isRecognizing || _isVerify) return;
-
-    _isRecognizing = true;
-
-    try {
-      final convertedImage =
-          ImageUtil.convertCameraImageToImgWithRotation(image, rotation);
-
-      if (convertedImage == null) return;
-
-      final recognize = await faceRecognition.recognizeFace(convertedImage);
-
-      if (recognize != null && recognize['confidence'] != null) {
-        final confidencePercent = (recognize['confidence'] * 100).round();
-
-        _isVerify = confidencePercent > 50;
-      }
-    } catch (e) {
-      print('Error in async recognition: $e');
-    } finally {
-      _isRecognizing = false;
     }
   }
 
@@ -155,7 +81,7 @@ class FaceDetectionService {
     return allBytes.done().buffer.asUint8List();
   }
 
-  void init(CameraDescription camera) {
+  void initCameraRotation(CameraDescription camera) {
     if (defaultTargetPlatform == TargetPlatform.android) {
       if (camera.lensDirection == CameraLensDirection.front) {
         _rotation = InputImageRotation.rotation270deg;
@@ -167,37 +93,8 @@ class FaceDetectionService {
     }
   }
 
-  static Rect scaleRect({
-    required Rect rect,
-    required Size size,
-    required Size widgetSize,
-  }) {
-    final double scaleX = widgetSize.width / size.width;
-    final double scaleY = widgetSize.height / size.height;
-    final double scale = scaleX < scaleY ? scaleX : scaleY;
-
-    // Calculate centered position offsets
-    final double scaledWidth = size.width * scale;
-    final double scaledHeight = size.height * scale;
-    final double offsetX = (widgetSize.width - scaledWidth) / 2;
-    final double offsetY = (widgetSize.height - scaledHeight) / 2;
-
-    // Scale the rectangle
-    double left = rect.left * scale + offsetX;
-    double top = rect.top * scale + offsetY;
-    double right = rect.right * scale + offsetX;
-    double bottom = rect.bottom * scale + offsetY;
-
-    return Rect.fromLTRB(
-      left.clamp(0, left),
-      top.clamp(0, top),
-      right.clamp(0, right),
-      bottom.clamp(0, bottom),
-    );
-  }
-
   void dispose() {
-    detector.close();
-    onDetection.close();
+    _detector.close();
+    _detectionStream.close();
   }
 }

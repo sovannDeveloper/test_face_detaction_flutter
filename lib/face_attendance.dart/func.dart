@@ -1,5 +1,22 @@
 part of 'main.dart';
 
+Face? getSingleFace(List<Face>? faces) {
+  if (faces == null || faces.isEmpty) return null;
+
+  double maxWidth = 0;
+  Face? selected;
+
+  for (final face in faces) {
+    final width = face.boundingBox.width;
+    if (width > maxWidth) {
+      maxWidth = width;
+      selected = face;
+    }
+  }
+
+  return selected;
+}
+
 Future<Uint8List> addTextWatermark(File imageFile, String watermarkText) async {
   final originalImage = img.decodeImage(await imageFile.readAsBytes());
 

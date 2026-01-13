@@ -9,49 +9,102 @@ class FacePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    Color color = const Color.fromARGB(255, 255, 0, 0);
+    final faceWidth = face.boundingBox.width;
+    final scaleX = size.width / imageSize.width;
+    final scaleY = size.height / imageSize.height;
+    final scale = scaleX < scaleY ? scaleX : scaleY;
 
-    if (isVerify) {
-      color = const Color.fromARGB(255, 0, 255, 102);
+    final baseDotRadius = faceWidth * scale * 0.01;
+    void drawContourByIndex(
+      FaceContourType type,
+      List<int> Function(List<Point<int>>) indexSelector,
+    ) {
+      final contour = face.contours[type];
+      final points = contour?.points ?? [];
+
+      if (points.isEmpty) return;
+
+      for (final i in indexSelector(points)) {
+        final point = points.elementAtOrNull(i);
+
+        if (point == null) continue;
+
+        final offset =
+            scalePoint(point: point, size: imageSize, widgetSize: size);
+        final randomRadius =
+            baseDotRadius * (0.3 + (1 * (point.x % 100) / 100));
+        final randomOpacity = 128 + ((point.y % 128));
+        final dotPaint = Paint()
+          ..style = PaintingStyle.fill
+          ..color = Color.fromARGB(randomOpacity, 255, 255, 255);
+
+        canvas.drawCircle(offset, randomRadius, dotPaint);
+      }
     }
 
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..color = color
-      ..strokeCap = StrokeCap.round;
-
-    final rect = FaceDetectionService.scaleRect(
-        rect: face.boundingBox, size: imageSize, widgetSize: size);
-    final cornerLength = rect.width * 0.1;
-
-    // Top-left corner
-    canvas.drawLine(
-        rect.topLeft, Offset(rect.left + cornerLength, rect.top), paint);
-    canvas.drawLine(
-        rect.topLeft, Offset(rect.left, rect.top + cornerLength), paint);
-
-    // Top-right corner
-    canvas.drawLine(Offset(rect.right, rect.top),
-        Offset(rect.right - cornerLength, rect.top), paint);
-    canvas.drawLine(Offset(rect.right, rect.top),
-        Offset(rect.right, rect.top + cornerLength), paint);
-
-    // Bottom-left corner
-    canvas.drawLine(Offset(rect.left, rect.bottom),
-        Offset(rect.left + cornerLength, rect.bottom), paint);
-    canvas.drawLine(Offset(rect.left, rect.bottom),
-        Offset(rect.left, rect.bottom - cornerLength), paint);
-
-    // Bottom-right corner
-    canvas.drawLine(Offset(rect.right, rect.bottom),
-        Offset(rect.right - cornerLength, rect.bottom), paint);
-    canvas.drawLine(Offset(rect.right, rect.bottom),
-        Offset(rect.right, rect.bottom - cornerLength), paint);
+    // Draw face contours
+    drawContourByIndex(FaceContourType.face, _getFacePoints);
+    drawContourByIndex(FaceContourType.leftEyebrowTop, _getCenterPoint);
+    drawContourByIndex(FaceContourType.rightEyebrowTop, _getCenterPoint);
+    drawContourByIndex(FaceContourType.leftEye, _getLeftEyePoints);
+    drawContourByIndex(FaceContourType.rightEye, _getRightEyePoints);
+    drawContourByIndex(FaceContourType.noseBridge, _getLastPoint);
+    drawContourByIndex(FaceContourType.upperLipTop, _getFirstCenterLastPoints);
+    drawContourByIndex(FaceContourType.lowerLipBottom, _getCenterPoint);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+
+  static Offset scalePoint({
+    required Point<int> point,
+    required Size size,
+    required Size widgetSize,
+  }) {
+    final scaleX = widgetSize.width / size.width;
+    final scaleY = widgetSize.height / size.height;
+    final scale = scaleX < scaleY ? scaleX : scaleY;
+
+    final scaledWidth = size.width * scale;
+    final scaledHeight = size.height * scale;
+
+    final offsetX = (widgetSize.width - scaledWidth) / 2;
+    final offsetY = (widgetSize.height - scaledHeight) / 2;
+
+    return Offset(
+      point.x * scale + offsetX,
+      point.y * scale + offsetY,
+    );
+  }
+
+  // Point selection helpers
+  List<int> _getFacePoints(List<Point<int>> points) {
+    final bottom = (points.length / 2).ceil();
+    final left = (bottom / 2).ceil();
+    final right = (3 * left).ceil();
+    return [0, left, bottom, right];
+  }
+
+  List<int> _getCenterPoint(List<Point<int>> points) {
+    final center = (points.length / 2).ceil() - 1;
+    return [center];
+  }
+
+  List<int> _getLastPoint(List<Point<int>> points) {
+    return [points.length - 1];
+  }
+
+  List<int> _getFirstCenterLastPoints(List<Point<int>> points) {
+    return [0, ..._getCenterPoint(points), ..._getLastPoint(points)];
+  }
+
+  List<int> _getLeftEyePoints(List<Point<int>> points) {
+    return [..._getCenterPoint(points), 0];
+  }
+
+  List<int> _getRightEyePoints(List<Point<int>> points) {
+    return [0, ..._getCenterPoint(points)];
+  }
 }
 
 class Group6Painter extends CustomPainter {
@@ -102,4 +155,126 @@ class Group6Painter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class RPSCustomPainter extends CustomPainter {
+  final Color? borderColor;
+  final Color? backgroundColor;
+  final String? topText;
+  final String? bottomText;
+
+  RPSCustomPainter({
+    this.borderColor,
+    this.backgroundColor,
+    this.topText,
+    this.bottomText,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Semi-transparent overlay
+    Path path = Path();
+    path.moveTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.lineTo(0, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width, size.height);
+    path.close();
+
+    double centerY = size.height * 0.45;
+    double radiusX = size.width * 0.40;
+    double radiusY = size.height * 0.23;
+
+    // Add ellipse cutout
+    path.addOval(Rect.fromCenter(
+      center: Offset(size.width * 0.5, centerY),
+      width: radiusX * 2,
+      height: radiusY * 2,
+    ));
+
+    path.fillType = PathFillType.evenOdd;
+
+    Paint paintFill = Paint()..style = PaintingStyle.fill;
+    paintFill.color = backgroundColor ?? const Color.fromARGB(255, 0, 0, 0);
+    canvas.drawPath(path, paintFill);
+
+    // Draw ellipse stroke (background)
+    Paint paintStroke0 = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.03;
+    paintStroke0.color = backgroundColor ?? const Color.fromARGB(255, 0, 0, 0);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, centerY),
+        width: radiusX * 2,
+        height: radiusY * 2,
+      ),
+      paintStroke0,
+    );
+
+    // Draw ellipse stroke (border)
+    Paint paintStroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.015;
+    paintStroke.color = borderColor ?? Colors.red;
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, centerY),
+        width: radiusX * 2,
+        height: radiusY * 2,
+      ),
+      paintStroke,
+    );
+
+    // Draw top text
+    if (topText != null && topText!.isNotEmpty) {
+      final textPainterTop = TextPainter(
+        text: TextSpan(
+          text: topText,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: size.width * 0.05,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainterTop.layout();
+      textPainterTop.paint(
+        canvas,
+        Offset(
+          (size.width - textPainterTop.width) / 2,
+          centerY - radiusY - size.height * 0.08,
+        ),
+      );
+    }
+
+    // Draw bottom text
+    if (bottomText != null && bottomText!.isNotEmpty) {
+      final textPainterBottom = TextPainter(
+        text: TextSpan(
+          text: bottomText,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: size.width * 0.045,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainterBottom.layout();
+      textPainterBottom.paint(
+        canvas,
+        Offset(
+          (size.width - textPainterBottom.width) / 2,
+          centerY + radiusY + size.height * 0.03,
+        ),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return true;
+  }
 }
