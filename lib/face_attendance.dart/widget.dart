@@ -3,9 +3,8 @@ part of 'main.dart';
 class FacePainter extends CustomPainter {
   final Face face;
   final Size imageSize;
-  final bool isVerify;
 
-  FacePainter(this.face, this.imageSize, this.isVerify);
+  FacePainter(this.face, this.imageSize);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -232,7 +231,7 @@ class RPSCustomPainter extends CustomPainter {
         text: TextSpan(
           text: topText,
           style: TextStyle(
-            color: Colors.white,
+            color: const Color.fromARGB(255, 26, 26, 26),
             fontSize: size.width * 0.05,
             fontWeight: FontWeight.bold,
           ),
@@ -255,7 +254,7 @@ class RPSCustomPainter extends CustomPainter {
         text: TextSpan(
           text: bottomText,
           style: TextStyle(
-            color: Colors.white,
+            color: const Color.fromARGB(255, 26, 26, 26),
             fontSize: size.width * 0.045,
             fontWeight: FontWeight.w500,
           ),

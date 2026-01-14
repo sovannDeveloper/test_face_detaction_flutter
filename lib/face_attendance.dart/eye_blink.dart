@@ -5,42 +5,25 @@ class BlinkEvent {
   final DateTime timestamp;
   final Duration? duration;
 
-  BlinkEvent({
-    required this.type,
-    required this.timestamp,
-    this.duration,
-  });
-
-  @override
-  String toString() {
-    return 'BlinkEvent(type: $type, time: $timestamp, duration: ${duration?.inMilliseconds}ms)';
-  }
+  BlinkEvent({required this.type, required this.timestamp, this.duration});
 }
 
-enum BlinkType {
-  none,
-  leftEye,
-  rightEye,
-  bothEyes,
-}
+enum BlinkType { none, leftEye, rightEye, bothEyes }
 
 class AdvancedBlinkDetector {
-  double _eyeClosedThreshold = 0.35; // Lower threshold for faster detection
+  double _eyeClosedThreshold = 0.35;
   final List<double> _leftEyeHistory = [];
   final List<double> _rightEyeHistory = [];
-  final int _historySize = 20; // Reduced for faster calibration
-
+  final int _historySize = 20;
   bool _isCalibrated = false;
   bool _wasBothEyesClosed = false;
-
   int _blinkCount = 0;
   DateTime? _lastBlinkTime;
   DateTime? _eyesClosedTime;
 
-  // More lenient timing for faster detection
-  static const int _minBlinkInterval = 80; // Reduced from 100ms
-  static const int _minBlinkDuration = 30; // Reduced from 50ms
-  static const int _maxBlinkDuration = 800; // Increased from 600ms
+  static const int _minBlinkInterval = 80;
+  static const int _minBlinkDuration = 30;
+  static const int _maxBlinkDuration = 800;
 
   void calibrate(Face face) {
     final leftProb = face.leftEyeOpenProbability;
@@ -67,23 +50,16 @@ class AdvancedBlinkDetector {
       final avgRight =
           _rightEyeHistory.reduce((a, b) => a + b) / _rightEyeHistory.length;
 
-      // More aggressive threshold (50% instead of 55%)
       _eyeClosedThreshold = ((avgLeft + avgRight) / 2) * 0.50;
       _isCalibrated = true;
-
-      print(
-          '✓ Calibrated! Threshold: ${_eyeClosedThreshold.toStringAsFixed(3)}');
     }
   }
 
   BlinkEvent processFrame(Face face) {
-    // Skip calibration and use default threshold for immediate detection
     if (!_isCalibrated && _leftEyeHistory.length < 5) {
-      // Use default threshold immediately for first few frames
       _eyeClosedThreshold = 0.35;
     }
 
-    // Continue calibration in background
     if (_leftEyeHistory.length < _historySize) {
       calibrate(face);
     }
@@ -96,14 +72,12 @@ class AdvancedBlinkDetector {
     final bothEyesClosed = leftEyeClosed && rightEyeClosed;
     final now = DateTime.now();
 
-    // Eyes closing
     if (bothEyesClosed && !_wasBothEyesClosed) {
       _wasBothEyesClosed = true;
       _eyesClosedTime = now;
       return BlinkEvent(type: BlinkType.none, timestamp: now);
     }
 
-    // Eyes opening - blink completed
     if (!bothEyesClosed && _wasBothEyesClosed) {
       _wasBothEyesClosed = false;
 
@@ -113,7 +87,6 @@ class AdvancedBlinkDetector {
 
       bool isValidBlink = true;
 
-      // Check minimum interval
       if (_lastBlinkTime != null) {
         final timeSinceLastBlink =
             now.difference(_lastBlinkTime!).inMilliseconds;
@@ -122,7 +95,6 @@ class AdvancedBlinkDetector {
         }
       }
 
-      // More lenient duration check
       if (durationMs > 0 && durationMs < _minBlinkDuration) {
         isValidBlink = false;
       } else if (durationMs > _maxBlinkDuration) {
@@ -133,9 +105,6 @@ class AdvancedBlinkDetector {
         _blinkCount++;
         _lastBlinkTime = now;
         _eyesClosedTime = null;
-
-        print(
-            '👁️ Blink #$_blinkCount | Duration: ${durationMs}ms | L:${leftProb.toStringAsFixed(2)} R:${rightProb.toStringAsFixed(2)}');
 
         return BlinkEvent(
           type: BlinkType.bothEyes,

@@ -1,5 +1,26 @@
 part of 'main.dart';
 
+enum DetectionStep { recognize, blink, done }
+
+class LiveDetectionEvent {
+  final DetectionStep step;
+  final int trackingId;
+
+  LiveDetectionEvent({
+    this.step = DetectionStep.recognize,
+    this.trackingId = 0,
+  });
+
+  LiveDetectionEvent copyWith({
+    DetectionStep? step,
+    int? trackingId,
+  }) =>
+      LiveDetectionEvent(
+        step: step ?? this.step,
+        trackingId: trackingId ?? this.trackingId,
+      );
+}
+
 class LiveDetectionScreen extends StatefulWidget {
   final CameraDescription camera;
   final FaceRecognitionService recognition;
@@ -18,11 +39,17 @@ class LiveDetectionScreen extends StatefulWidget {
 
 class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
   late final _detector = widget.detection;
+  StreamSubscription<List<Face>>? _detectionStream;
   late final _recognition = widget.recognition..reset();
+  StreamSubscription<RecognitionServiceData?>? _recognitionStream;
+  final _blinkDetector = AdvancedBlinkDetector();
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
-  int _trackingId = 0;
-  bool _isFaceRecognized = false;
+  final _facesNotifier = ValueNotifier<Face?>(null);
+
+  /// Value
+  final _valueStream = StreamController<LiveDetectionEvent>.broadcast();
+  LiveDetectionEvent _value = LiveDetectionEvent();
 
   @override
   void initState() {
@@ -37,14 +64,58 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
     _initializeControllerFuture = _controller.initialize().then((_) {
       _controller.startImageStream((image) {
         _detector.processCameraImage(image);
-        _recognition.processCameraImage(image);
+        _recognition.process(image);
       });
+    });
+
+    _detectionStream = _detector.stream.listen((faces) {
+      if (_value.step == DetectionStep.done) return;
+
+      final face = getSingleFace(faces);
+
+      _facesNotifier.value = face;
+
+      // Reset
+      if (face?.trackingId != _value.trackingId) {
+        _blinkDetector.resetCalibration();
+        _recognition.reset();
+        _value = _value.copyWith(
+          step: DetectionStep.recognize,
+          trackingId: face?.trackingId ?? 0,
+        );
+        _valueStream.add(_value);
+        print('--=> Reset');
+      }
+
+      // Blink step
+      if (_value.step == DetectionStep.blink && face != null) {
+        final blinking = _blinkDetector.processFrame(face);
+
+        print('--=> ${blinking.type}');
+
+        if (blinking.type == BlinkType.bothEyes) {
+          _value = _value.copyWith(step: DetectionStep.done);
+          _valueStream.add(_value);
+        }
+      }
+    });
+    _recognitionStream = _recognition.stream.listen((data) {
+      final isVerified = data?.isVerify ?? false;
+
+      if (isVerified) {
+        _value = _value.copyWith(step: DetectionStep.blink);
+        _valueStream.add(_value);
+      }
     });
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _valueStream.close();
+    _facesNotifier.dispose();
+    _detectionStream?.cancel();
+    _recognitionStream?.cancel();
     super.dispose();
   }
 
@@ -56,66 +127,55 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
         children: [
           FutureBuilder<void>(
             future: _initializeControllerFuture,
-            builder: (context, snapshot) {
+            builder: (_, snapshot) {
               if (snapshot.connectionState == ConnectionState.done) {
-                return StreamBuilder(
-                    stream: _detector.stream,
-                    builder: (_, s) {
-                      final face = getSingleFace(s.data);
+                return Center(
+                  child: AspectRatio(
+                    aspectRatio: _imageSize.width / _imageSize.height,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CameraPreview(_controller),
+                        ValueListenableBuilder(
+                            valueListenable: _facesNotifier,
+                            builder: (_, face, w) {
+                              if (face == null ||
+                                  _value.step == DetectionStep.done) {
+                                return const SizedBox();
+                              }
 
-                      if (face == null || face.trackingId != _trackingId) {
-                        _trackingId = face?.trackingId ?? 0;
-                        Future.microtask(_recognition.reset);
-                      }
-
-                      return Center(
-                        child: AspectRatio(
-                          aspectRatio: _controller.value.previewSize!.height /
-                              _controller.value.previewSize!.width,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              CameraPreview(_controller),
-                              if (face != null)
-                                CustomPaint(
-                                  painter: FacePainter(
-                                      face,
-                                      Size(
-                                        _controller.value.previewSize!.height,
-                                        _controller.value.previewSize!.width,
-                                      ),
-                                      true),
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    });
-              } else {
-                return const Center(child: CircularProgressIndicator());
+                              final pain = FacePainter(face, _imageSize);
+                              return CustomPaint(painter: pain);
+                            }),
+                      ],
+                    ),
+                  ),
+                );
               }
+
+              return const Center(child: CircularProgressIndicator());
             },
           ),
           StreamBuilder(
-              stream: _recognition.stream,
+              stream: _valueStream.stream,
               builder: (_, s) {
-                final d = s.data;
-                final isVerify = d?.isVerify ?? false;
-
-                Future.microtask(() => _isFaceRecognized = isVerify);
+                final data = s.data;
+                final isVerified = data?.step != DetectionStep.recognize;
 
                 return Positioned.fill(
                     child: CustomPaint(
                         painter: RPSCustomPainter(
-                  borderColor: isVerify ? Colors.green : null,
-                  backgroundColor:
-                      Theme.of(context).appBarTheme.backgroundColor,
-                  topText: isVerify ? 'Please blink your eyes' : null,
-                  bottomText: '03:00',
+                  borderColor: isVerified ? Colors.green : null,
+                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                  topText: 'Please blink your eyes',
+                  bottomText: '03:00 ${data?.step}',
                 )));
               }),
         ],
       ),
     );
   }
+
+  Size get _imageSize => Size(_controller.value.previewSize!.height,
+      _controller.value.previewSize!.width);
 }

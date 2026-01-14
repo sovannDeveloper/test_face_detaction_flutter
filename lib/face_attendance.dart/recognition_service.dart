@@ -24,12 +24,7 @@ class FaceRecognitionService {
   bool _isRecognizing = false;
   bool _isVerify = false;
   int _frameCount = 0;
-
   bool get isVerify => _isVerify;
-
-  void reset() {
-    _isVerify = false;
-  }
 
   double threshold = 0.5;
 
@@ -51,10 +46,13 @@ class FaceRecognitionService {
     threshold = newThreshold;
   }
 
+  void reset() {
+    _isVerify = false;
+  }
+
   static Future<void> loadModel() async {
     try {
       onLoad.add('Loading model');
-      final options = InterpreterOptions()..threads = 4;
       interpreter =
           await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
       _inputBuffer = Float32List(1 * inputSize * inputSize * 3);
@@ -136,7 +134,7 @@ class FaceRecognitionService {
     return dotProduct;
   }
 
-  Future<void> processCameraImage(CameraImage image) async {
+  Future<void> process(CameraImage image) async {
     if (_isRecognizing || _isVerify) return;
 
     _isRecognizing = true;
@@ -144,7 +142,7 @@ class FaceRecognitionService {
     try {
       _frameCount++;
 
-      if (_frameCount % 10 != 0) {
+      if (_frameCount % 30 != 0) {
         _isRecognizing = false;
         return;
       }
