@@ -1,5 +1,3 @@
-
-
 part of 'main.dart';
 
 class ImageUtil {
@@ -266,12 +264,10 @@ class ImageUtil {
       img.Image? image = convertCameraImageToImg(cameraImage);
       if (image == null) return null;
 
-      // Rotate if specified
       if (rotation != null && rotation != InputImageRotation.rotation0deg) {
         image = rotateImage(image, rotation);
       }
 
-      // Downsample if specified
       if (maxSize != null &&
           (image.width > maxSize || image.height > maxSize)) {
         image = img.copyResize(

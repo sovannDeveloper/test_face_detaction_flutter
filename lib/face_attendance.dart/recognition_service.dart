@@ -5,10 +5,11 @@ class RecognitionServiceData {
   final bool matched;
   final bool isVerify;
 
-  RecognitionServiceData(
-      {required this.confidence,
-      required this.matched,
-      required this.isVerify});
+  RecognitionServiceData({
+    required this.confidence,
+    required this.matched,
+    required this.isVerify,
+  });
 }
 
 class FaceRecognitionService {
@@ -24,8 +25,8 @@ class FaceRecognitionService {
   bool _isRecognizing = false;
   bool _isVerify = false;
   int _frameCount = 0;
-  bool get isVerify => _isVerify;
-
+  DateTime? _lastProcessTime;
+  static const _minProcessInterval = Duration(milliseconds: 100);
   double threshold = 0.5;
 
   Stream<RecognitionServiceData?> get stream => _onRecognition.stream;
@@ -46,10 +47,6 @@ class FaceRecognitionService {
     threshold = newThreshold;
   }
 
-  void reset() {
-    _isVerify = false;
-  }
-
   static Future<void> loadModel() async {
     try {
       onLoad.add('Loading model');
@@ -65,7 +62,7 @@ class FaceRecognitionService {
     }
   }
 
-  static Float32List preprocessImageOptimized(img.Image image) {
+  static Float32List _preprocessImageOptimized(img.Image image) {
     img.Image resizedImage = img.copyResize(
       image,
       width: inputSize,
@@ -95,7 +92,7 @@ class FaceRecognitionService {
     }
 
     try {
-      var input = preprocessImageOptimized(faceImage);
+      var input = _preprocessImageOptimized(faceImage);
       var inputReshaped = input.reshape([1, inputSize, inputSize, 3]);
 
       _outputBuffer ??= Float32List(outputSize);
@@ -104,14 +101,14 @@ class FaceRecognitionService {
       interpreter!.run(inputReshaped, output);
 
       List<double> embedding = List<double>.from(output[0]);
-      return normalizeEmbeddingFast(embedding);
+      return _normalizeEmbeddingFast(embedding);
     } catch (e) {
       print('✗ Error getting face embedding: $e');
       return null;
     }
   }
 
-  static List<double> normalizeEmbeddingFast(List<double> embedding) {
+  static List<double> _normalizeEmbeddingFast(List<double> embedding) {
     double sumSquared = 0.0;
     for (int i = 0; i < embedding.length; i++) {
       sumSquared += embedding[i] * embedding[i];
@@ -126,7 +123,7 @@ class FaceRecognitionService {
     return embedding;
   }
 
-  double cosineSimilarity(List<double> embedding1, List<double> embedding2) {
+  double _cosineSimilarity(List<double> embedding1, List<double> embedding2) {
     double dotProduct = 0.0;
     for (int i = 0; i < embedding1.length; i++) {
       dotProduct += embedding1[i] * embedding2[i];
@@ -137,34 +134,64 @@ class FaceRecognitionService {
   Future<void> process(CameraImage image) async {
     if (_isRecognizing || _isVerify) return;
 
+    final now = DateTime.now();
+
+    if (_lastProcessTime != null &&
+        now.difference(_lastProcessTime!) < _minProcessInterval) {
+      return;
+    }
+
     _isRecognizing = true;
+    _lastProcessTime = now;
 
     try {
       _frameCount++;
 
       if (_frameCount % 30 != 0) {
-        _isRecognizing = false;
         return;
       }
 
       final convertedImage =
           ImageUtil.convertCameraImageToImgWithRotation(image, _rotation);
 
-      if (convertedImage == null) return;
+      if (convertedImage == null) {
+        return;
+      }
 
-      final recognize = await recognizeFace(convertedImage);
-      double confidence = recognize?['confidence'] ?? 0;
+      final recognize = await recognizeFace(convertedImage)
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+
+      if (recognize == null) {
+        if (_onRecognition.hasListener) {
+          _onRecognition.add(RecognitionServiceData(
+            confidence: 0.0,
+            matched: false,
+            isVerify: false,
+          ));
+        }
+        return;
+      }
+
+      double confidence = recognize['confidence'] ?? 0;
       int confidencePercent = (confidence * 100).round();
 
-      _onRecognition.add(RecognitionServiceData(
-        confidence: confidence,
-        matched: recognize?['matched'] ?? false,
-        isVerify: confidencePercent > 50,
-      ));
+      if (_onRecognition.hasListener) {
+        _onRecognition.add(RecognitionServiceData(
+          confidence: confidence,
+          matched: recognize['matched'] ?? false,
+          isVerify: confidencePercent > 50,
+        ));
+      }
 
       _isVerify = confidencePercent > 50;
     } catch (e) {
-      print('Error in async recognition: $e');
+      if (_onRecognition.hasListener) {
+        _onRecognition.add(RecognitionServiceData(
+          confidence: 0.0,
+          matched: false,
+          isVerify: false,
+        ));
+      }
     } finally {
       _isRecognizing = false;
     }
@@ -208,7 +235,7 @@ class FaceRecognitionService {
 
         onProgress?.call(i + 1, files.length);
       } catch (e) {
-        print('Error processing image at index $i: $e');
+        print('✗ Error processing image at index $i: $e');
         error.add('$i-Error: $e');
         continue;
       }
@@ -243,7 +270,7 @@ class FaceRecognitionService {
       int maxIndex = -1;
 
       for (int i = 0; i < registeredFaces.length; i++) {
-        double similarity = cosineSimilarity(embedding, registeredFaces[i]);
+        double similarity = _cosineSimilarity(embedding, registeredFaces[i]);
 
         if (similarity > maxSimilarity) {
           maxSimilarity = similarity;
@@ -277,42 +304,15 @@ class FaceRecognitionService {
     return Future.wait(faceImages.map((image) => recognizeFace(image)));
   }
 
+  void reset() {
+    _isVerify = false;
+  }
+
   void clearRegisteredFaces() {
     registeredFaces.clear();
   }
 
   void dispose() {
     _onRecognition.close();
-  }
-
-  Future<List<Map<String, dynamic>>?> getAllSimilarities(
-    img.Image faceImage,
-  ) async {
-    List<double>? embedding = await getFaceEmbedding(faceImage);
-
-    if (embedding == null || registeredFaces.isEmpty) {
-      return null;
-    }
-
-    List<Map<String, dynamic>> results = [];
-    for (int i = 0; i < registeredFaces.length; i++) {
-      double similarity = cosineSimilarity(embedding, registeredFaces[i]);
-      results.add({
-        'similarity': similarity,
-        'percentage': (similarity * 100).toStringAsFixed(2),
-      });
-    }
-
-    results.sort((a, b) =>
-        (b['similarity'] as double).compareTo(a['similarity'] as double));
-    return results;
-  }
-
-  static Future<img.Image> loadImageFromFile(String filePath) async {
-    final imageFile = File(filePath);
-    final bytes = await imageFile.readAsBytes();
-
-    img.Image image = img.decodeImage(Uint8List.fromList(bytes))!;
-    return image;
   }
 }

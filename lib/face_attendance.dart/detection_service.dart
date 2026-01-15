@@ -5,6 +5,10 @@ class FaceDetectionService {
   late InputImageRotation _rotation;
   bool _isDetecting = false;
   int _frameCount = 0;
+  DateTime? _lastProcessTime;
+  static const _minProcessInterval = Duration(milliseconds: 100);
+
+  InputImageRotation get rotation => _rotation;
 
   final _detector = FaceDetector(
     options: FaceDetectorOptions(
@@ -19,20 +23,28 @@ class FaceDetectionService {
 
   Stream<List<Face>> get stream => _detectionStream.stream;
 
-  void processCameraImage(CameraImage image) async {
+  // Make this properly async with Future return type
+  Future<void> processCameraImage(CameraImage image) async {
     if (_isDetecting) return;
+
+    final now = DateTime.now();
+
+    if (_lastProcessTime != null &&
+        now.difference(_lastProcessTime!) < _minProcessInterval) {
+      return;
+    }
+
     _isDetecting = true;
+    _lastProcessTime = now;
 
     try {
       _frameCount++;
 
       if (_frameCount % 3 != 0) {
-        _isDetecting = false;
         return;
       }
 
       final format = _getInputImageFormat(image.format);
-
       final originalImageSize = Size(
         image.width.toDouble(),
         image.height.toDouble(),
@@ -48,11 +60,17 @@ class FaceDetectionService {
         ),
       );
 
-      final faces = await _detector.processImage(inputImage);
+      final faces = await _detector
+          .processImage(inputImage)
+          .timeout(const Duration(seconds: 2), onTimeout: () => <Face>[]);
 
-      _detectionStream.add(faces);
+      if (_detectionStream.hasListener) {
+        _detectionStream.add(faces);
+      }
     } catch (e) {
-      print('Error processing image: $e');
+      if (_detectionStream.hasListener) {
+        _detectionStream.add(<Face>[]);
+      }
     } finally {
       _isDetecting = false;
     }

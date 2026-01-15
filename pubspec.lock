@@ -402,6 +402,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  mix:
+    dependency: transitive
+    description:
+      name: mix
+      sha256: "63133a6bdfef069573f5cd91de67d05ae20c1143114a51caaa5b072945bcf973"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.5.4"
+  mix_annotations:
+    dependency: transitive
+    description:
+      name: mix_annotations
+      sha256: "2562df9177715e35f1cce9e8967e1f6b539364b34aea88d3f4098593a0fb2d6f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.1"
   path:
     dependency: transitive
     description:
@@ -498,6 +514,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.2"
+  remix:
+    dependency: "direct main"
+    description:
+      name: remix
+      sha256: "0cc06d639b0aaa33a0306b54df19c755cb5c5f6d605ec9c0ae9bd6f003ffb882"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.4"
+  remixicon:
+    dependency: "direct main"
+    description:
+      name: remixicon
+      sha256: "9a0e6a67d622a1d6ddc5e5cff4898f9711ec8880fc2ebeb720f6e0bc268ea905"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.1"
   sky_engine:
     dependency: transitive
     description: flutter

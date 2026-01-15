@@ -277,3 +277,119 @@ class RPSCustomPainter extends CustomPainter {
     return true;
   }
 }
+
+/// Eye blink icon
+class EyeBlinkWidget extends StatefulWidget {
+  final String text;
+  final double size;
+  final Color color;
+  final bool autoBlink;
+  final Duration blinkInterval;
+  final Duration blinkDuration;
+  final VoidCallback? onTap;
+  final bool initiallyBlinking;
+  final bool hideEye;
+
+  const EyeBlinkWidget({
+    super.key,
+    this.text = '',
+    this.size = 30.0,
+    this.color = const Color.fromARGB(255, 23, 23, 23),
+    this.autoBlink = true,
+    this.blinkInterval = const Duration(seconds: 2),
+    this.blinkDuration = const Duration(milliseconds: 200),
+    this.onTap,
+    this.initiallyBlinking = false,
+    this.hideEye = false,
+  });
+
+  @override
+  State<EyeBlinkWidget> createState() => _EyeBlinkWidgetState();
+}
+
+class _EyeBlinkWidgetState extends State<EyeBlinkWidget> {
+  bool _isBlinking = false;
+  Timer? _blinkTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _isBlinking = widget.initiallyBlinking;
+    if (widget.autoBlink) {
+      _startAutoBlink();
+    }
+  }
+
+  @override
+  void dispose() {
+    _blinkTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(EyeBlinkWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.autoBlink != oldWidget.autoBlink) {
+      if (widget.autoBlink) {
+        _startAutoBlink();
+      } else {
+        _blinkTimer?.cancel();
+      }
+    }
+  }
+
+  void _startAutoBlink() {
+    _blinkTimer?.cancel();
+    _blinkTimer = Timer.periodic(widget.blinkInterval, (timer) {
+      _blink();
+    });
+  }
+
+  void _blink() {
+    if (!mounted) return;
+
+    setState(() {
+      _isBlinking = true;
+    });
+
+    Future.delayed(widget.blinkDuration, () {
+      if (mounted) {
+        setState(() {
+          _isBlinking = false;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        _blink();
+        widget.onTap?.call();
+      },
+      child: AnimatedSwitcher(
+        duration: widget.blinkDuration,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!widget.hideEye)
+              Icon(
+                _isBlinking ? RemixIcons.eye_close_fill : RemixIcons.eye_fill,
+                key: ValueKey(_isBlinking),
+                size: widget.size,
+                color: widget.color,
+              ),
+            if (!widget.hideEye) const SizedBox(width: 8),
+            Text(widget.text,
+                style: TextStyle(
+                  color: widget.color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: widget.size * 0.6,
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+}

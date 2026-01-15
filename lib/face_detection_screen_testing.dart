@@ -137,27 +137,6 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
                   ),
                 ),
               ),
-        floatingActionButton: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_selectedImage != null)
-              FloatingActionButton.extended(
-                onPressed: () async {
-                  if (_selectedImage == null) return;
-
-                  final faceImage =
-                      await FaceRecognitionService.loadImageFromFile(
-                          _selectedImage!.path);
-                  final result = await _recognition.recognizeFace(faceImage);
-
-                  _resultText = '$result';
-                  setState(() {});
-                },
-                icon: const Icon(Icons.star),
-                label: const Text('Recognition'),
-              ),
-          ],
-        ),
       ),
     );
   }

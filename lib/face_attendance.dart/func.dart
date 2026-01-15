@@ -68,3 +68,35 @@ Future<Uint8List> addImageWatermark(
 
   return Uint8List.fromList(img.encodePng(original));
 }
+
+bool isFaceCentered(Face? face, Size imageSize, {double threshold = 0.07}) {
+  if (face == null) return false;
+
+  final boundingBox = face.boundingBox;
+
+  final faceCenterX = boundingBox.left + boundingBox.width / 2;
+  final faceCenterY = boundingBox.top + boundingBox.height / 2;
+
+  final imageCenterX = imageSize.width / 2;
+  final imageCenterY = imageSize.height / 2;
+
+  final offsetX = (faceCenterX - imageCenterX).abs();
+  final offsetY = (faceCenterY - imageCenterY).abs();
+
+  final allowedOffsetX = imageSize.width * threshold;
+  final allowedOffsetY = imageSize.height * threshold;
+
+  return offsetX <= allowedOffsetX && offsetY <= allowedOffsetY;
+}
+
+bool isFaceLookingStraight(Face? face, {double angleThreshold = 10.0}) {
+  if (face == null) return false;
+
+  final eulerY = face.headEulerAngleY ?? 0;
+  final eulerX = face.headEulerAngleX ?? 0;
+  final eulerZ = face.headEulerAngleZ ?? 0;
+
+  return eulerY.abs() <= angleThreshold &&
+      eulerX.abs() <= angleThreshold &&
+      eulerZ.abs() <= angleThreshold;
+}
