@@ -33,7 +33,6 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
       _camera = _cameras
           .firstWhere((e) => e.lensDirection == CameraLensDirection.front);
       _faceDetection.initCameraRotation(_camera!);
-      _recognition.initCameraRotation(_camera!);
       setState(() {});
     });
   }
@@ -137,7 +136,7 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
                               });
                               final bytes = _selectedImage!.readAsBytesSync();
                               final result =
-                                  await _recognition.recognizeWithBytes(bytes);
+                                  await _recognition.recognize(bytes);
 
                               setState(() {
                                 _resultText = result.toString();

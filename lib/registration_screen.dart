@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
 
 import 'face_attendance.dart/main.dart';
 
@@ -74,26 +73,6 @@ class _CameraRecognitionScreenState extends State<CameraRecognitionScreen> {
     try {
       final XFile image = await _controller!.takePicture();
       final bytes = await File(image.path).readAsBytes();
-      final img.Image? capturedImage = img.decodeImage(bytes);
-
-      if (capturedImage != null) {
-        final recognition =
-            await widget.faceService.recognizeFace(capturedImage);
-
-        if (recognition != null && mounted) {
-          setState(() {
-            if (recognition['matched']) {
-              _result =
-                  '✓ ${recognition['name']}\n${(recognition['confidence'] * 100).toStringAsFixed(1)}%';
-            } else {
-              _result =
-                  '✗ Unknown\n${(recognition['confidence'] * 100).toStringAsFixed(1)}%';
-            }
-          });
-        } else if (mounted) {
-          setState(() => _result = 'No faces registered');
-        }
-      }
     } catch (e) {
       print('Error capturing/recognizing: $e');
       if (mounted) {
