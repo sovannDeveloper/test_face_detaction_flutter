@@ -1,26 +1,5 @@
 part of 'main.dart';
 
-enum LiveDetectionStep { recognize, blink, done }
-
-class LiveDetectionEvent {
-  final LiveDetectionStep step;
-  final int trackingId;
-
-  LiveDetectionEvent({
-    this.step = LiveDetectionStep.recognize,
-    this.trackingId = 0,
-  });
-
-  LiveDetectionEvent copyWith({
-    LiveDetectionStep? step,
-    int? trackingId,
-  }) =>
-      LiveDetectionEvent(
-        step: step ?? this.step,
-        trackingId: trackingId ?? this.trackingId,
-      );
-}
-
 enum _Stage { initializing, expired, completed }
 
 class LiveDetectionScreen extends StatefulWidget {
@@ -28,43 +7,52 @@ class LiveDetectionScreen extends StatefulWidget {
   final FaceRecognitionService recognition;
   final FaceDetectionService detection;
 
-  const LiveDetectionScreen(
-      {required this.camera,
-      required this.detection,
-      required this.recognition,
-      super.key});
+  const LiveDetectionScreen({
+    required this.camera,
+    required this.detection,
+    required this.recognition,
+    super.key,
+  });
 
   @override
   State<LiveDetectionScreen> createState() => _LiveDetectionScreenState();
 }
 
 class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
+  static const _durationInSeconds = 30;
+
   _Stage _stage = _Stage.initializing;
-  final _durationInSeconds = 300;
-  late final _timerNotifier = ValueNotifier<int>(_durationInSeconds);
+  late final ValueNotifier<int> _timerNotifier =
+      ValueNotifier(_durationInSeconds);
   Timer? _timer;
   Uint8List? _capturedImage;
 
   @override
   void initState() {
     super.initState();
-
-    resetTimer();
+    _startTimer();
   }
 
-  void resetTimer() {
+  void _startTimer() {
     _timer?.cancel();
+    _timerNotifier.value = _durationInSeconds;
+
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_timerNotifier.value > 0) {
-        _timerNotifier.value -= 1;
+        _timerNotifier.value--;
       } else {
-        setState(() {
-          _stage = _Stage.expired;
-        });
-        _timer?.cancel();
+        setState(() => _stage = _Stage.expired);
+        timer.cancel();
       }
     });
-    _timerNotifier.value = _durationInSeconds;
+  }
+
+  void _restartDetection() {
+    setState(() {
+      _stage = _Stage.initializing;
+      _capturedImage = null;
+    });
+    _startTimer();
   }
 
   @override
@@ -76,23 +64,28 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_stage == _Stage.completed) {
-      return Scaffold(
-        body: Center(
-          child: Stack(
-            children: [
-              if (_capturedImage != null)
-                Image.memory(
-                  _capturedImage!,
-                ),
-              Positioned.fill(
-                  child: Column(
+    switch (_stage) {
+      case _Stage.completed:
+        return _buildCompletedScreen();
+      case _Stage.expired:
+        return _buildExpiredScreen();
+      case _Stage.initializing:
+        return _buildDetectionWidget();
+    }
+  }
+
+  Widget _buildCompletedScreen() {
+    return Scaffold(
+      body: Center(
+        child: Stack(
+          children: [
+            if (_capturedImage != null)
+              Image.memory(_capturedImage!, fit: BoxFit.cover),
+            Positioned.fill(
+              child: Column(
                 children: [
                   const Spacer(),
-                  Positioned(
-                      top: MediaQuery.of(context).padding.top + 100,
-                      left: 20,
-                      child: EyeBlinkWidget(text: 'Please blink your eyes')),
+                  const EyeBlinkWidget(text: 'Detection Complete'),
                   Parent(
                     style: ParentStyle()
                       ..background.color(Colors.black.withOpacity(0.6))
@@ -108,75 +101,65 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
                         ),
                         const SizedBox(height: 20),
                         ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _stage = _Stage.initializing;
-                              resetTimer();
-                            });
-                          },
-                          child: Text('Restart Detection'),
+                          onPressed: _restartDetection,
+                          child: const Text('Restart Detection'),
                         ),
                         TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                            child: Text('Back to Home')),
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Back to Home'),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 40),
                 ],
-              ))
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (_stage == _Stage.expired) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Txt('Time Expired',
-                  style: TxtStyle()
-                    ..fontSize(24)
-                    ..textColor(Colors.red)),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _stage = _Stage.initializing;
-                    resetTimer();
-                  });
-                },
-                child: Text('Restart Detection'),
               ),
-              TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: Text('Back to Home')),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
+  Widget _buildExpiredScreen() {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Txt(
+              'Time Expired',
+              style: TxtStyle()
+                ..fontSize(24)
+                ..textColor(Colors.red),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _restartDetection,
+              child: const Text('Restart Detection'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Back to Home'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetectionWidget() {
     return _LiveDetectionWidget(
       camera: widget.camera,
       detection: widget.detection,
       recognition: widget.recognition,
       timerNotifier: _timerNotifier,
-      onChange: (event, img) {
-        if (event.step == LiveDetectionStep.done) {
-          setState(() {
-            _timer?.cancel();
-            _capturedImage = img;
-            _stage = _Stage.completed;
-          });
-        }
+      onDone: (img) {
+        setState(() {
+          _timer?.cancel();
+          _capturedImage = img;
+          _stage = _Stage.completed;
+        });
       },
     );
   }
@@ -187,14 +170,14 @@ class _LiveDetectionWidget extends StatefulWidget {
   final FaceRecognitionService recognition;
   final FaceDetectionService detection;
   final ValueNotifier<int> timerNotifier;
-  final Function(LiveDetectionEvent event, Uint8List? img)? onChange;
+  final Function(Uint8List? img)? onDone;
 
   const _LiveDetectionWidget({
     required this.camera,
     required this.detection,
     required this.recognition,
     required this.timerNotifier,
-    this.onChange,
+    this.onDone,
   });
 
   @override
@@ -202,24 +185,22 @@ class _LiveDetectionWidget extends StatefulWidget {
 }
 
 class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
-  late final _detector = widget.detection;
-  StreamSubscription<List<Face>>? _detectionStream;
-  late final _recognition = widget.recognition..reset();
-  StreamSubscription<RecognitionServiceData?>? _recognitionStream;
+  late final FaceDetectionService _detector = widget.detection;
+  late final CameraController _controller;
+  late final Future<void> _initializeControllerFuture;
   final _blinkDetector = AdvancedBlinkDetector();
-  late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
   final _facesNotifier = ValueNotifier<Face?>(null);
-  CameraImage? _image;
-  int _currentTrackingId = 0;
-
-  /// Value
-  final _valueStream = StreamController<LiveDetectionEvent>.broadcast();
-  LiveDetectionEvent _value = LiveDetectionEvent();
+  StreamSubscription<(List<Face>, CameraImage)>? _detectionStream;
 
   @override
   void initState() {
     super.initState();
+
+    _initializeCamera();
+    _setupDetectionStreams();
+  }
+
+  void _initializeCamera() {
     _controller = CameraController(
       widget.camera,
       ResolutionPreset.high,
@@ -228,95 +209,60 @@ class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
     );
 
     _initializeControllerFuture = _controller.initialize().then((_) {
-      _controller.startImageStream((image) {
-        _image = image;
-        _detector.processCameraImage(image);
-        _recognition.process(image);
-      });
+      _controller.startImageStream(_detector.process);
     });
+  }
 
-    _detectionStream = _detector.stream.listen((faces) async {
-      if (_value.step == LiveDetectionStep.done) return;
-
-      final face = getSingleFace(faces);
-      _facesNotifier.value = face;
-
-      final id = face?.trackingId ?? 0;
-
-      if (id != 0 && id != _currentTrackingId) {
-        _currentTrackingId = id;
-      }
-
-      // Reset
-      if (_currentTrackingId != _value.trackingId) {
-        _blinkDetector.resetCalibration();
-        _recognition.reset();
-        _value = _value.copyWith(
-          step: LiveDetectionStep.recognize,
-          trackingId: _currentTrackingId,
-        );
-        _valueStream.add(_value);
-        widget.onChange?.call(_value, null);
-        print('--=> Reset');
-      }
-
-      // Blink step
-      if (_value.step == LiveDetectionStep.blink && face != null) {
-        final isFaceCentered0 = isFaceCentered(face, _imageSize);
-        final isFaceProperSize0 = isFaceLookingStraight(face);
-
-        if (!isFaceCentered0 || !isFaceProperSize0) {
-          return;
-        }
-
-        final blinking = _blinkDetector.processFrame(face);
-
-        if (blinking.type == BlinkType.bothEyes) {
-          _value = _value.copyWith(step: LiveDetectionStep.done);
-          _valueStream.add(_value);
-          Uint8List? image;
-          if (_image != null) {
-            image = ImageUtil.convertCameraImageToByteWithOptions(
-              _image!,
-              rotation: _detector.rotation,
-              quality: 50,
-            );
-          }
-
-          Uint8List? img;
-
-          if (image != null) {
-            final tempDir = Directory.systemTemp;
-            final filePath =
-                '${tempDir.path}/face_${DateTime.now().millisecondsSinceEpoch}.jpg';
-            final file = File(filePath);
-            file.writeAsBytesSync(image);
-            final rawPath = Uint8List.fromList(filePath.codeUnits);
-            img = await addTextWatermark(
-                File.fromRawPath(rawPath), 'Verified at ${DateTime.now()}');
-          }
-          widget.onChange?.call(_value, img);
-        }
-      }
+  void _setupDetectionStreams() {
+    _detectionStream = _detector.stream.listen((event) {
+      _handleFaceDetection(event.$1, event.$2);
     });
-    _recognitionStream = _recognition.stream.listen((data) {
-      final isVerified = data?.isVerify ?? false;
+  }
 
-      if (isVerified) {
-        _value = _value.copyWith(step: LiveDetectionStep.blink);
-        _valueStream.add(_value);
-        widget.onChange?.call(_value, null);
-      }
-    });
+  Future<void> _handleFaceDetection(List<Face> faces, CameraImage image) async {
+    final face = getSingleFace(faces);
+    _facesNotifier.value = face;
+
+    if (face == null) return;
+
+    final faceCentered = isFaceCentered(face, _imageSize);
+    final isFaceStraight = isFaceLookingStraight(face);
+
+    if (!faceCentered || !isFaceStraight) return;
+
+    final blinkResult = _blinkDetector.processFrame(face);
+
+    if (blinkResult.type == BlinkType.bothEyes) {
+      await _completDetection();
+    }
+  }
+
+  Future<void> _completDetection() async {
+    // widget.onDone?.call(capturedImage);
+  }
+
+  Future<Uint8List?> _addWatermarkToImage(Uint8List image) async {
+    try {
+      final tempDir = Directory.systemTemp;
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filePath = '${tempDir.path}/face_$timestamp.jpg';
+      final file = File(filePath);
+
+      await file.writeAsBytes(image);
+
+      final watermarkText = DateTime.now().toIso8601String();
+      return await addTextWatermark(file, watermarkText);
+    } catch (e) {
+      debugPrint('Error adding watermark: $e');
+      return image;
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _valueStream.close();
     _facesNotifier.dispose();
     _detectionStream?.cancel();
-    _recognitionStream?.cancel();
     super.dispose();
   }
 
@@ -326,106 +272,140 @@ class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          FutureBuilder<void>(
-            future: _initializeControllerFuture,
-            builder: (_, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                return Center(
-                  child: AspectRatio(
-                    aspectRatio: _imageSize.width / _imageSize.height,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CameraPreview(_controller),
-                        ValueListenableBuilder(
-                            valueListenable: _facesNotifier,
-                            builder: (_, face, w) {
-                              if (face == null ||
-                                  _value.step == LiveDetectionStep.done) {
-                                return const SizedBox();
-                              }
-
-                              final pain = FacePainter(face, _imageSize);
-                              return CustomPaint(painter: pain);
-                            }),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              return const Center(child: CircularProgressIndicator());
-            },
-          ),
-          StreamBuilder(
-              stream: _valueStream.stream,
-              builder: (_, s) {
-                final data = s.data;
-                final isVerified = data?.step != LiveDetectionStep.recognize;
-
-                return ValueListenableBuilder(
-                    valueListenable: widget.timerNotifier,
-                    builder: (_, t, w) {
-                      final duration = Duration(seconds: t);
-                      return Positioned.fill(
-                          child: StreamBuilder(
-                              stream: _valueStream.stream,
-                              builder: (_, s) {
-                                return CustomPaint(
-                                    painter: RPSCustomPainter(
-                                  borderColor: isVerified ? Colors.green : null,
-                                  backgroundColor:
-                                      Theme.of(context).scaffoldBackgroundColor,
-                                  bottomText: '${duration.inSeconds}s',
-                                ));
-                              }));
-                    });
-              }),
-          Positioned(
-              top: MediaQuery.of(context).padding.top + 10,
-              left: 10,
-              child: const BackButton()),
-          ValueListenableBuilder(
-            valueListenable: _facesNotifier,
-            builder: (_, face, w) => StreamBuilder(
-                stream: _valueStream.stream,
-                builder: (_, s) {
-                  String text = 'Please look at the camera';
-
-                  if (s.data?.step == LiveDetectionStep.blink) {
-                    text = 'Please blink your eyes';
-                  }
-
-                  final isFaceCentered0 = isFaceCentered(face, _imageSize);
-
-                  final isFaceProperSize0 = isFaceLookingStraight(face);
-
-                  if (!isFaceProperSize0) {
-                    text = 'Please look straight to the camera';
-                  }
-
-                  if (!isFaceCentered0) {
-                    text = 'Please center your face';
-                  }
-
-                  return Positioned(
-                      top: MediaQuery.of(context).padding.top + 100,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: EyeBlinkWidget(
-                          text: text,
-                          hideEye: s.data?.step != LiveDetectionStep.blink,
-                          color: Colors.black,
-                        ),
-                      ));
-                }),
-          ),
+          _buildCameraPreview(),
+          _buildOverlay(),
+          _buildBackButton(context),
+          _buildInstructionText(context),
         ],
       ),
     );
   }
 
-  Size get _imageSize => Size(_controller.value.previewSize?.height ?? 0,
-      _controller.value.previewSize?.width ?? 0);
+  Widget _buildCameraPreview() {
+    return FutureBuilder<void>(
+      future: _initializeControllerFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          return Center(
+            child: AspectRatio(
+              aspectRatio: _imageSize.width / _imageSize.height,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CameraPreview(_controller),
+                  _buildFaceOverlay(),
+                ],
+              ),
+            ),
+          );
+        }
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+  }
+
+  Widget _buildFaceOverlay() {
+    return ValueListenableBuilder<Face?>(
+      valueListenable: _facesNotifier,
+      builder: (context, face, child) {
+        if (face == null) {
+          return const SizedBox.shrink();
+        }
+
+        return CustomPaint(painter: FacePainter(face, _imageSize));
+      },
+    );
+  }
+
+  Widget _buildOverlay() {
+    return ValueListenableBuilder(
+        valueListenable: _facesNotifier,
+        builder: (_, face, __) {
+          final instructionData = _getInstructionData(face);
+
+          return ValueListenableBuilder<int>(
+            valueListenable: widget.timerNotifier,
+            builder: (context, seconds, child) {
+              return Positioned.fill(
+                child: CustomPaint(
+                  painter: RPSCustomPainter(
+                    borderColor:
+                        instructionData.hideEye ? Colors.grey : Colors.green,
+                    backgroundColor: Colors.amber,
+                    bottomText: '${seconds}s',
+                  ),
+                ),
+              );
+            },
+          );
+        });
+  }
+
+  Widget _buildBackButton(BuildContext context) {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 10,
+      left: 10,
+      child: const BackButton(),
+    );
+  }
+
+  Widget _buildInstructionText(BuildContext context) {
+    return ValueListenableBuilder<Face?>(
+      valueListenable: _facesNotifier,
+      builder: (_, face, __) {
+        final instructionData = _getInstructionData(face);
+
+        return Positioned(
+          top: MediaQuery.of(context).padding.top + 100,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: EyeBlinkWidget(
+              text: instructionData.text,
+              initiallyBlinking: true,
+              hideEye: instructionData.hideEye,
+              color: instructionData.hideEye ? Colors.white : Colors.green,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  _InstructionData _getInstructionData(Face? face) {
+    final isFaceCentered0 = isFaceCentered(face, _imageSize);
+    final isFaceStraight = isFaceLookingStraight(face);
+
+    if (!isFaceStraight) {
+      return const _InstructionData(
+        text: 'Look straight to the camera',
+        hideEye: true,
+      );
+    } else if (!isFaceCentered0) {
+      return const _InstructionData(
+        text: 'Center your face',
+        hideEye: true,
+      );
+    } else {
+      return const _InstructionData(
+        text: 'Blink your eyes',
+        hideEye: false,
+      );
+    }
+  }
+
+  Size get _imageSize => Size(
+        _controller.value.previewSize?.height ?? 0,
+        _controller.value.previewSize?.width ?? 0,
+      );
+}
+
+class _InstructionData {
+  final String text;
+  final bool hideEye;
+
+  const _InstructionData({
+    required this.text,
+    required this.hideEye,
+  });
 }

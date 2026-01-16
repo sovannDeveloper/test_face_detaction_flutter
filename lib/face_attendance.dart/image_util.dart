@@ -141,67 +141,9 @@ class ImageUtil {
     return null;
   }
 
-  /// Downsample image for faster processing
-  static img.Image? convertCameraImageToImgDownsampled(
-    CameraImage image, {
-    int? maxWidth,
-    int? maxHeight,
-  }) {
-    try {
-      img.Image? convertedImage = convertCameraImageToImg(image);
-      if (convertedImage == null) return null;
 
-      // Downsample if size is specified
-      if (maxWidth != null || maxHeight != null) {
-        return img.copyResize(
-          convertedImage,
-          width: maxWidth,
-          height: maxHeight,
-          maintainAspect: true,
-        );
-      }
+  
 
-      return convertedImage;
-    } catch (e) {
-      print('Error converting downsampled image: $e');
-    }
-    return null;
-  }
-
-  /// Convert with rotation AND downsampling - FASTEST for recognition
-  static img.Image? convertForRecognition(
-    CameraImage image,
-    InputImageRotation rotation, {
-    int maxSize = 640, // Smaller = faster
-  }) {
-    try {
-      // Convert
-      img.Image? convertedImage = convertCameraImageToImg(image);
-      if (convertedImage == null) return null;
-
-      // Rotate if needed
-      if (rotation != InputImageRotation.rotation0deg) {
-        convertedImage = rotateImage(convertedImage, rotation);
-      }
-
-      // Downsample for speed
-      if (convertedImage.width > maxSize || convertedImage.height > maxSize) {
-        convertedImage = img.copyResize(
-          convertedImage,
-          width: convertedImage.width > convertedImage.height ? maxSize : null,
-          height: convertedImage.height > convertedImage.width ? maxSize : null,
-          maintainAspect: true,
-        );
-      }
-
-      return convertedImage;
-    } catch (e) {
-      print('Error in convertForRecognition: $e');
-    }
-    return null;
-  }
-
-  /// Rotate image based on InputImageRotation
   static img.Image rotateImage(
     img.Image image,
     InputImageRotation rotation,
@@ -218,29 +160,7 @@ class ImageUtil {
     }
   }
 
-  /// Get rotation angle from InputImageRotation
-  static int getRotationAngle(InputImageRotation rotation) {
-    switch (rotation) {
-      case InputImageRotation.rotation0deg:
-        return 0;
-      case InputImageRotation.rotation90deg:
-        return 90;
-      case InputImageRotation.rotation180deg:
-        return 180;
-      case InputImageRotation.rotation270deg:
-        return 270;
-    }
-  }
 
-  /// Convert to bytes - FAST
-  static Uint8List? convertCameraImageToByte(
-    CameraImage cameraImage, {
-    int quality = 85,
-  }) {
-    final image = convertCameraImageToImg(cameraImage);
-    if (image == null) return null;
-    return Uint8List.fromList(img.encodeJpg(image, quality: quality));
-  }
 
   /// Convert to bytes with rotation - FAST
   static Uint8List? convertCameraImageToByteWithRotation(

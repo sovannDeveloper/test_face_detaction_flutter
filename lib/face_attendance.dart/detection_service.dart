@@ -1,12 +1,11 @@
 part of 'main.dart';
 
 class FaceDetectionService {
-  final _detectionStream = StreamController<List<Face>>.broadcast();
+  final _detectionStream =
+      StreamController<(List<Face>, CameraImage)>.broadcast();
   late InputImageRotation _rotation;
   bool _isDetecting = false;
   int _frameCount = 0;
-  DateTime? _lastProcessTime;
-  static const _minProcessInterval = Duration(milliseconds: 100);
 
   InputImageRotation get rotation => _rotation;
 
@@ -21,29 +20,25 @@ class FaceDetectionService {
     ),
   );
 
-  Stream<List<Face>> get stream => _detectionStream.stream;
+  Stream<(List<Face>, CameraImage)> get stream => _detectionStream.stream;
 
-  // Make this properly async with Future return type
-  Future<void> processCameraImage(CameraImage image) async {
+  void process(CameraImage image) {
     if (_isDetecting) return;
 
-    final now = DateTime.now();
+    _frameCount++;
 
-    if (_lastProcessTime != null &&
-        now.difference(_lastProcessTime!) < _minProcessInterval) {
+    if (_frameCount % 5 != 0) {
       return;
     }
 
+    _processImageAsync(image);
+  }
+
+  // Separate async method that runs in background
+  Future<void> _processImageAsync(CameraImage image) async {
     _isDetecting = true;
-    _lastProcessTime = now;
 
     try {
-      _frameCount++;
-
-      if (_frameCount % 3 != 0) {
-        return;
-      }
-
       final format = _getInputImageFormat(image.format);
       final originalImageSize = Size(
         image.width.toDouble(),
@@ -60,16 +55,17 @@ class FaceDetectionService {
         ),
       );
 
-      final faces = await _detector
-          .processImage(inputImage)
-          .timeout(const Duration(seconds: 2), onTimeout: () => <Face>[]);
+      final faces = await _detector.processImage(inputImage).timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => <Face>[],
+          );
 
       if (_detectionStream.hasListener) {
-        _detectionStream.add(faces);
+        _detectionStream.add((faces, image));
       }
     } catch (e) {
       if (_detectionStream.hasListener) {
-        _detectionStream.add(<Face>[]);
+        _detectionStream.add((<Face>[], image));
       }
     } finally {
       _isDetecting = false;

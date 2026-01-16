@@ -41,7 +41,6 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
   @override
   void dispose() {
     _faceDetection.dispose();
-    _recognition.dispose();
     super.dispose();
   }
 

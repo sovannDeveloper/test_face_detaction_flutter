@@ -3,18 +3,14 @@ part of 'main.dart';
 class RecognitionServiceData {
   final double confidence;
   final bool matched;
-  final bool isVerify;
 
   RecognitionServiceData({
     required this.confidence,
     required this.matched,
-    required this.isVerify,
   });
 }
 
 class FaceRecognitionService {
-  final _onRecognition = StreamController<RecognitionServiceData?>.broadcast();
-  static final onLoad = StreamController<String?>.broadcast();
   static Interpreter? interpreter;
   static List<List<double>> registeredFaces = [];
   static const int inputSize = 112;
@@ -22,14 +18,7 @@ class FaceRecognitionService {
   static Float32List? _inputBuffer;
   static Float32List? _outputBuffer;
   late InputImageRotation _rotation;
-  bool _isRecognizing = false;
-  bool _isVerify = false;
-  int _frameCount = 0;
-  DateTime? _lastProcessTime;
-  static const _minProcessInterval = Duration(milliseconds: 100);
   double threshold = 0.5;
-
-  Stream<RecognitionServiceData?> get stream => _onRecognition.stream;
 
   void initCameraRotation(CameraDescription camera) {
     if (defaultTargetPlatform == TargetPlatform.android) {
@@ -49,15 +38,12 @@ class FaceRecognitionService {
 
   static Future<void> loadModel() async {
     try {
-      onLoad.add('Loading model');
       interpreter =
           await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
       _inputBuffer = Float32List(1 * inputSize * inputSize * 3);
       _outputBuffer = Float32List(outputSize);
-      onLoad.add('Successful loaded');
     } catch (e) {
       print('✗ Error loading model: $e');
-      onLoad.add('Error: $e');
       rethrow;
     }
   }
@@ -131,69 +117,29 @@ class FaceRecognitionService {
     return dotProduct;
   }
 
-  Future<void> process(CameraImage image) async {
-    if (_isRecognizing || _isVerify) return;
-
-    final now = DateTime.now();
-
-    if (_lastProcessTime != null &&
-        now.difference(_lastProcessTime!) < _minProcessInterval) {
-      return;
-    }
-
-    _isRecognizing = true;
-    _lastProcessTime = now;
-
+  Future<RecognitionServiceData?> processAsync(CameraImage image) async {
     try {
-      _frameCount++;
-
-      if (_frameCount % 30 != 0) {
-        return;
-      }
-
       final convertedImage =
           ImageUtil.convertCameraImageToImgWithRotation(image, _rotation);
 
       if (convertedImage == null) {
-        return;
+        return null;
       }
 
       final recognize = await recognizeFace(convertedImage)
           .timeout(const Duration(seconds: 3), onTimeout: () => null);
 
       if (recognize == null) {
-        if (_onRecognition.hasListener) {
-          _onRecognition.add(RecognitionServiceData(
-            confidence: 0.0,
-            matched: false,
-            isVerify: false,
-          ));
-        }
-        return;
+        return null;
       }
 
-      double confidence = recognize['confidence'] ?? 0;
-      int confidencePercent = (confidence * 100).round();
-
-      if (_onRecognition.hasListener) {
-        _onRecognition.add(RecognitionServiceData(
-          confidence: confidence,
-          matched: recognize['matched'] ?? false,
-          isVerify: confidencePercent > 50,
-        ));
-      }
-
-      _isVerify = confidencePercent > 50;
+      return RecognitionServiceData(
+        confidence: recognize['confidence'] ?? 0,
+        matched: recognize['matched'] ?? false,
+      );
     } catch (e) {
-      if (_onRecognition.hasListener) {
-        _onRecognition.add(RecognitionServiceData(
-          confidence: 0.0,
-          matched: false,
-          isVerify: false,
-        ));
-      }
-    } finally {
-      _isRecognizing = false;
+      print('✗ Recognition error: $e');
+      return null;
     }
   }
 
@@ -250,6 +196,57 @@ class FaceRecognitionService {
     return (true, errorToText());
   }
 
+  static Future<(bool, String?)> loadRegisterFacesFromBytes(
+    List<Uint8List> imageBytes, {
+    Function(int current, int total)? onProgress,
+  }) async {
+    if (imageBytes.isEmpty || interpreter == null) {
+      registeredFaces.clear();
+      return (false, 'Images: ${imageBytes.length} or Model not loaded');
+    }
+
+    List<List<double>> registerFaces0 = [];
+    List<String> error = ['Model: ${interpreter != null}'];
+    String errorToText() => error.join(', ');
+
+    for (int i = 0; i < imageBytes.length; i++) {
+      try {
+        final bytes = imageBytes[i];
+        final faceImage = img.decodeImage(bytes);
+
+        error.add('$i-Decoded: ${faceImage != null}');
+
+        if (faceImage == null) {
+          continue;
+        }
+
+        final embedding = await getFaceEmbedding(faceImage);
+
+        error.add('$i-Embedding: ${embedding != null}');
+
+        if (embedding == null) {
+          continue;
+        }
+
+        registerFaces0.add(embedding);
+
+        onProgress?.call(i + 1, imageBytes.length);
+      } catch (e) {
+        print('✗ Error processing image at index $i: $e');
+        error.add('$i-Error: $e');
+        continue;
+      }
+    }
+
+    registeredFaces = registerFaces0;
+
+    if (registeredFaces.isEmpty) {
+      return (false, errorToText());
+    }
+
+    return (true, errorToText());
+  }
+
   Future<Map<String, dynamic>?> recognizeFace(img.Image faceImage) async {
     try {
       List<double>? embedding = await getFaceEmbedding(faceImage);
@@ -259,11 +256,7 @@ class FaceRecognitionService {
       }
 
       if (registeredFaces.isEmpty) {
-        return {
-          'name': 'No registered faces',
-          'confidence': 0.0,
-          'matched': false
-        };
+        return {'confidence': 0.0, 'matched': false};
       }
 
       double maxSimilarity = -1.0;
@@ -287,7 +280,6 @@ class FaceRecognitionService {
       }
 
       return {
-        'name': 'Unknown',
         'confidence': maxSimilarity,
         'matched': false,
         'bestMatch': maxIndex >= 0 ? '' : null,
@@ -302,17 +294,5 @@ class FaceRecognitionService {
     List<img.Image> faceImages,
   ) async {
     return Future.wait(faceImages.map((image) => recognizeFace(image)));
-  }
-
-  void reset() {
-    _isVerify = false;
-  }
-
-  void clearRegisteredFaces() {
-    registeredFaces.clear();
-  }
-
-  void dispose() {
-    _onRecognition.close();
   }
 }

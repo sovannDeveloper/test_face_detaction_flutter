@@ -52,13 +52,6 @@ class _MyMainScreenState extends State<MyMainScreen> {
               child: Column(
                 children: [
                   Text('Result: $_text'),
-                  // Test face
-                  const SizedBox(height: 10),
-                  StreamBuilder(
-                      stream: FaceRecognitionService.onLoad.stream,
-                      builder: (_, s) {
-                        return SelectableText('${s.data}');
-                      }),
                   const SizedBox(height: 10),
                   ElevatedButton(
                       onPressed: () async {
