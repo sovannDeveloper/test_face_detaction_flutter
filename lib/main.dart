@@ -58,16 +58,15 @@ class _MyMainScreenState extends State<MyMainScreen> {
                         _text = 'Loading...';
                         _loading = true;
                         setState(() {});
-                        if (FaceRecognitionService.registeredFaces.isEmpty) {
-                          final images = await ImageStorageUtil.loadAllImages();
 
-                          await FaceRecognitionService.loadRegisterFaces(
-                            images,
-                            onProgress: (current, total) {
-                              print('--==> $total: $current');
-                            },
-                          );
-                        }
+                        final images = await ImageStorageUtil.loadAllImages();
+
+                        await FaceRecognitionService.loadRegisterFaces(
+                          images,
+                          onProgress: (current, total) {
+                            print('--==> $total: $current');
+                          },
+                        );
 
                         _loading = false;
                         setState(() {});
@@ -75,13 +74,7 @@ class _MyMainScreenState extends State<MyMainScreen> {
                         _go(const FaceDetectionPage());
                       },
                       child: Text('Face detection ${_loading ? '...' : ''}')),
-                  ElevatedButton(
-                      onPressed: () async {
-                        // await FaceRecognitionService.loadRegisterFaces();
-                        // _go(const FaceScreen());
-                      },
-                      child: const Text('Go to face detection')),
-                  const Divider(),
+                  const Divider(height: 20),
                   ElevatedButton(
                       onPressed: () async {
                         final img = await ImageStorageUtil.pickFromGallery();

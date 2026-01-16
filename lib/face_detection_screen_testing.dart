@@ -130,6 +130,20 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
+                        ElevatedButton(
+                            onPressed: () async {
+                              setState(() {
+                                _resultText = 'Processing...';
+                              });
+                              final bytes = _selectedImage!.readAsBytesSync();
+                              final result =
+                                  await _recognition.recognizeWithBytes(bytes);
+
+                              setState(() {
+                                _resultText = result.toString();
+                              });
+                            },
+                            child: Text('Recognize')),
                       ],
                       Text(_resultText),
                     ],

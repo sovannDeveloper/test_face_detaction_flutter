@@ -161,25 +161,13 @@ class FaceRecognitionService {
         final e = files[i];
         final file = File(e.path);
         final bytes = file.readAsBytesSync();
-        final faceImage = img.decodeImage(bytes);
-
-        error.add('$i-Exist: ${file.existsSync()}');
-
-        if (faceImage == null || !file.existsSync()) {
-          continue;
-        }
-
-        final embedding = await getFaceEmbedding(faceImage);
-
-        error.add('$i-Embedding: ${embedding != null}');
+        final embedding = await getEmbedding(bytes);
 
         if (embedding == null) {
           continue;
         }
 
         registerFaces0.add(embedding);
-
-        onProgress?.call(i + 1, files.length);
       } catch (e) {
         print('✗ Error processing image at index $i: $e');
         error.add('$i-Error: $e');
@@ -294,5 +282,97 @@ class FaceRecognitionService {
     List<img.Image> faceImages,
   ) async {
     return Future.wait(faceImages.map((image) => recognizeFace(image)));
+  }
+
+  /// ================================================================================
+  /// ======================== Recognition Service Version 2 =========================
+  /// ================================================================================
+  Future<Map<String, dynamic>?> recognizeWithBytes(Uint8List image) async {
+    try {
+      List<double>? embedding = await getEmbedding(image);
+
+      if (embedding == null) {
+        return null;
+      }
+
+      if (registeredFaces.isEmpty) {
+        return {'confidence': 0.0, 'matched': false};
+      }
+
+      double maxSimilarity = -1.0;
+      int maxIndex = -1;
+
+      for (int i = 0; i < registeredFaces.length; i++) {
+        double similarity = _cosineSimilarity(embedding, registeredFaces[i]);
+
+        if (similarity > maxSimilarity) {
+          maxSimilarity = similarity;
+          maxIndex = i;
+        }
+      }
+
+      if (maxSimilarity > threshold) {
+        return {
+          'confidence': maxSimilarity,
+          'matched': true,
+          'index': maxIndex,
+        };
+      }
+
+      return {
+        'confidence': maxSimilarity,
+        'matched': false,
+        'bestMatch': maxIndex >= 0 ? '' : null,
+      };
+    } catch (e) {
+      print('✗ Error in recognition: $e');
+      return null;
+    }
+  }
+
+  static Future<List<double>?> getEmbedding(Uint8List bytes) async {
+    if (interpreter == null) {
+      return null;
+    }
+
+    try {
+      final image = img.decodeImage(bytes);
+
+      if (image == null) {
+        return null;
+      }
+
+      final resizedImage = img.copyResize(
+        image,
+        width: inputSize,
+        height: inputSize,
+        interpolation: img.Interpolation.linear,
+      );
+
+      var input = Float32List(inputSize * inputSize * 3);
+      int pixelIndex = 0;
+
+      for (int y = 0; y < inputSize; y++) {
+        for (int x = 0; x < inputSize; x++) {
+          final pixel = resizedImage.getPixel(x, y);
+          input[pixelIndex++] = pixel.r / 255.0;
+          input[pixelIndex++] = pixel.g / 255.0;
+          input[pixelIndex++] = pixel.b / 255.0;
+        }
+      }
+
+      var inputReshaped = input.reshape([1, inputSize, inputSize, 3]);
+
+      _outputBuffer ??= Float32List(outputSize);
+      var output = _outputBuffer!.reshape([1, outputSize]);
+
+      interpreter!.run(inputReshaped, output);
+
+      List<double> embedding = List<double>.from(output[0]);
+      return _normalizeEmbeddingFast(embedding);
+    } catch (e) {
+      print('✗ Error getting embedding: $e');
+      return null;
+    }
   }
 }
