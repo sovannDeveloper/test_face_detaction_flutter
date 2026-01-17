@@ -17,7 +17,6 @@ class FaceDetectionPage extends StatefulWidget {
 
 class _FaceDetectionPageState extends State<FaceDetectionPage> {
   late final _faceDetection = FaceDetectionService();
-  final _spoofingDetector = FaceAntiSpoofingDetector();
   final _recognition = FaceRecognitionService();
   File? _selectedImage;
   bool _isProcessing = false;

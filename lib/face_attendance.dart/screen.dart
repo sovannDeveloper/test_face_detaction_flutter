@@ -28,6 +28,7 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
       ValueNotifier(_durationInSeconds);
   Timer? _timer;
   Uint8List? _capturedImage;
+  String _resultText = '';
 
   @override
   void initState() {
@@ -98,30 +99,34 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
         children: [
           if (_capturedImage != null)
             Image.memory(_capturedImage!, fit: BoxFit.cover),
-          // Positioned.fill(
-          //   child: Column(
-          //     children: [
-          //       const Spacer(),
-          //       Parent(
-          //         style: ParentStyle()
-          //           ..background.color(Colors.black.withOpacity(0.6))
-          //           ..borderRadius(all: 10)
-          //           ..padding(all: 20),
-          //         child: Column(
-          //           mainAxisSize: MainAxisSize.min,
-          //           children: [
-          //             const SizedBox(height: 20),
-          //             const Text(
-          //               'Detection Completed',
-          //               style: TextStyle(fontSize: 24, color: Colors.green),
-          //             ),
-          //           ],
-          //         ),
-          //       ),
-          //       const SizedBox(height: 40),
-          //     ],
-          //   ),
-          // ),
+          Positioned.fill(
+            child: Column(
+              children: [
+                const Spacer(),
+                Parent(
+                  style: ParentStyle()
+                    ..background.color(Colors.black.withOpacity(0.6))
+                    ..borderRadius(all: 10)
+                    ..padding(all: 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Detection Completed',
+                        style: TextStyle(fontSize: 24, color: Colors.green),
+                      ),
+                      Text(
+                        _resultText,
+                        style: TextStyle(fontSize: 8, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -167,10 +172,13 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
 
           for (var result in liveDetection) {
             if (result is Map<String, dynamic>) {
+              _resultText += '$result\n';
+              print('--=> ================================');
               print('--=> Recognition Result: $result');
               continue;
             }
           }
+          _resultText += '========================================\n';
         }
 
         setState(() {

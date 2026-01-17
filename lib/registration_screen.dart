@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
@@ -70,10 +68,7 @@ class _CameraRecognitionScreenState extends State<CameraRecognitionScreen> {
       _result = 'Processing...';
     });
 
-    try {
-      final XFile image = await _controller!.takePicture();
-      final bytes = await File(image.path).readAsBytes();
-    } catch (e) {
+    try {} catch (e) {
       print('Error capturing/recognizing: $e');
       if (mounted) {
         setState(() => _result = 'Error: ${e.toString()}');
