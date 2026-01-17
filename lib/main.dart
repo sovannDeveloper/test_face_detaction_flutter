@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'face_attendance.dart/main.dart';
 import 'face_detection_screen_testing.dart';
 
+final spoofingDetector = FaceAntiSpoofingDetector();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FluWakeLock().enable();
@@ -34,7 +36,12 @@ class _MyMainScreenState extends State<MyMainScreen> {
   void initState() {
     super.initState();
 
-    Future.microtask(FaceRecognitionService.loadModel);
+    Future.wait([
+      FaceRecognitionService.loadModel(),
+      spoofingDetector.loadModel(),
+    ]).then((_) {
+      setState(() {});
+    });
   }
 
   @override

@@ -180,9 +180,11 @@ class RPSCustomPainter extends CustomPainter {
     path.lineTo(size.width, size.height);
     path.close();
 
+    final circleSize = 1;
+
     double centerY = size.height * 0.45;
-    double radiusX = size.width * 0.40;
-    double radiusY = size.height * 0.205;
+    double radiusX = (size.width * 0.4) * circleSize;
+    double radiusY = (size.width * 0.5) * circleSize;
 
     // Add ellipse cutout
     path.addOval(Rect.fromCenter(

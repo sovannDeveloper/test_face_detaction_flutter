@@ -5,12 +5,14 @@ enum _Stage { initializing, expired, completed }
 class LiveDetectionScreen extends StatefulWidget {
   final CameraDescription camera;
   final FaceRecognitionService recognition;
+  final FaceAntiSpoofingDetector spoofingDetector;
   final FaceDetectionService detection;
 
   const LiveDetectionScreen({
     required this.camera,
     required this.detection,
     required this.recognition,
+    required this.spoofingDetector,
     super.key,
   });
 
@@ -64,86 +66,88 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Face'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _restartDetection,
+          ),
+          const SizedBox(width: 10),
+        ],
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
     switch (_stage) {
-      case _Stage.completed:
-        return _buildCompletedScreen();
-      case _Stage.expired:
-        return _buildExpiredScreen();
       case _Stage.initializing:
         return _buildDetectionWidget();
+      case _Stage.expired:
+        return _buildExpiredScreen();
+      case _Stage.completed:
+        return _buildCompletedScreen();
     }
   }
 
   Widget _buildCompletedScreen() {
-    return Scaffold(
-      body: Center(
-        child: Stack(
-          children: [
-            if (_capturedImage != null)
-              Image.memory(_capturedImage!, fit: BoxFit.cover),
-            Positioned.fill(
-              child: Column(
-                children: [
-                  const Spacer(),
-                  const EyeBlinkWidget(text: 'Detection Complete'),
-                  Parent(
-                    style: ParentStyle()
-                      ..background.color(Colors.black.withOpacity(0.6))
-                      ..borderRadius(all: 10)
-                      ..padding(all: 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Detection Completed',
-                          style: TextStyle(fontSize: 24, color: Colors.green),
-                        ),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: _restartDetection,
-                          child: const Text('Restart Detection'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Back to Home'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return Center(
+      child: Stack(
+        children: [
+          if (_capturedImage != null)
+            Image.memory(_capturedImage!, fit: BoxFit.cover),
+          // Positioned.fill(
+          //   child: Column(
+          //     children: [
+          //       const Spacer(),
+          //       Parent(
+          //         style: ParentStyle()
+          //           ..background.color(Colors.black.withOpacity(0.6))
+          //           ..borderRadius(all: 10)
+          //           ..padding(all: 20),
+          //         child: Column(
+          //           mainAxisSize: MainAxisSize.min,
+          //           children: [
+          //             const SizedBox(height: 20),
+          //             const Text(
+          //               'Detection Completed',
+          //               style: TextStyle(fontSize: 24, color: Colors.green),
+          //             ),
+          //           ],
+          //         ),
+          //       ),
+          //       const SizedBox(height: 40),
+          //     ],
+          //   ),
+          // ),
+        ],
       ),
     );
   }
 
   Widget _buildExpiredScreen() {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Txt(
-              'Time Expired',
-              style: TxtStyle()
-                ..fontSize(24)
-                ..textColor(Colors.red),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _restartDetection,
-              child: const Text('Restart Detection'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Back to Home'),
-            ),
-          ],
-        ),
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Txt(
+            'Time Expired',
+            style: TxtStyle()
+              ..fontSize(24)
+              ..textColor(Colors.red),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _restartDetection,
+            child: const Text('Restart Detection'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Back to Home'),
+          ),
+        ],
       ),
     );
   }
@@ -154,7 +158,21 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
       detection: widget.detection,
       recognition: widget.recognition,
       timerNotifier: _timerNotifier,
-      onDone: (img) {
+      onDone: (img) async {
+        if (img != null) {
+          final liveDetection = await Future.wait([
+            widget.recognition.recognize(img),
+            widget.spoofingDetector.detectSpoof(img),
+          ]);
+
+          for (var result in liveDetection) {
+            if (result is Map<String, dynamic>) {
+              print('--=> Recognition Result: $result');
+              continue;
+            }
+          }
+        }
+
         setState(() {
           _timer?.cancel();
           _capturedImage = img;
@@ -191,6 +209,7 @@ class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
   final _blinkDetector = AdvancedBlinkDetector();
   final _facesNotifier = ValueNotifier<Face?>(null);
   StreamSubscription<(List<Face>, CameraImage)>? _detectionStream;
+  bool _isDone = false;
 
   @override
   void initState() {
@@ -232,8 +251,14 @@ class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
 
     final blinkResult = _blinkDetector.processFrame(face);
 
-    if (blinkResult.type == BlinkType.bothEyes) {
-      await _completDetection();
+    if (blinkResult.type == BlinkType.bothEyes && !_isDone) {
+      _isDone = true;
+
+      final capturedImage = ImageUtil.convertCameraImageToByteWithRotation(
+        image,
+        _detector.rotation,
+      );
+      widget.onDone?.call(capturedImage);
     }
   }
 

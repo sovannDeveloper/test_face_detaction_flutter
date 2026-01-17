@@ -1,5 +1,11 @@
 part of 'main.dart';
 
+/// Blink twice
+/// Turn head left
+/// Turn head right
+/// Smile
+/// Raise eyebrows
+
 class FaceDetectionService {
   final _detectionStream =
       StreamController<(List<Face>, CameraImage)>.broadcast();

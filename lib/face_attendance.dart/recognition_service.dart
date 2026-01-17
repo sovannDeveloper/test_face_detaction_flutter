@@ -13,12 +13,11 @@ class RecognitionServiceData {
 }
 
 class FaceRecognitionService {
-  static Interpreter? interpreter;
+  static Interpreter? _interpreter;
   static List<List<double>> registeredFaces = [];
-  static const int inputSize = 112;
-  static const int outputSize = 192;
-  static Float32List? _outputBuffer;
-  double threshold = 0.6;
+  static const int _inputSize = 112;
+  static const int _outputSize = 192;
+  double threshold = 0.5;
 
   void setThreshold(double newThreshold) {
     threshold = newThreshold;
@@ -26,8 +25,9 @@ class FaceRecognitionService {
 
   static Future<void> loadModel() async {
     try {
-      interpreter =
+      _interpreter =
           await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
+      print('--=> Model Recognized loaded successfully');
     } catch (e) {
       print('✗ Error loading model: $e');
       rethrow;
@@ -38,13 +38,13 @@ class FaceRecognitionService {
     List<File> files, {
     Function(int current, int total)? onProgress,
   }) async {
-    if (files.isEmpty || interpreter == null) {
+    if (files.isEmpty || _interpreter == null) {
       registeredFaces.clear();
       return (false, 'File: ${files.length} or Model not loaded');
     }
 
     List<List<double>> registerFaces0 = [];
-    List<String> error = ['Model: ${interpreter != null}'];
+    List<String> error = ['Model: ${_interpreter != null}'];
     String errorToText() => error.join(', ');
 
     for (int i = 0; i < files.length; i++) {
@@ -114,7 +114,7 @@ class FaceRecognitionService {
   }
 
   static Future<List<double>?> _getEmbedding(Uint8List bytes) async {
-    if (interpreter == null) {
+    if (_interpreter == null) {
       return null;
     }
 
@@ -127,16 +127,16 @@ class FaceRecognitionService {
 
       final resizedImage = img.copyResize(
         image,
-        width: inputSize,
-        height: inputSize,
+        width: _inputSize,
+        height: _inputSize,
         interpolation: img.Interpolation.cubic,
       );
 
-      var input = Float32List(inputSize * inputSize * 3);
+      var input = Float32List(_inputSize * _inputSize * 3);
       int pixelIndex = 0;
 
-      for (int y = 0; y < inputSize; y++) {
-        for (int x = 0; x < inputSize; x++) {
+      for (int y = 0; y < _inputSize; y++) {
+        for (int x = 0; x < _inputSize; x++) {
           final pixel = resizedImage.getPixel(x, y);
 
           input[pixelIndex++] = (pixel.r - 127.5) / 128.0;
@@ -145,12 +145,12 @@ class FaceRecognitionService {
         }
       }
 
-      var inputReshaped = input.reshape([1, inputSize, inputSize, 3]);
+      var inputReshaped = input.reshape([1, _inputSize, _inputSize, 3]);
 
-      _outputBuffer ??= Float32List(outputSize);
-      var output = _outputBuffer!.reshape([1, outputSize]);
+      final outputBuffer = Float32List(_outputSize);
+      var output = outputBuffer.reshape([1, _outputSize]);
 
-      interpreter!.run(inputReshaped, output);
+      _interpreter!.run(inputReshaped, output);
 
       List<double> embedding = List<double>.from(output[0]);
 
@@ -170,10 +170,8 @@ class FaceRecognitionService {
 
     double magnitude = sqrt(sumSquared);
 
-    // Avoid division by zero
     if (magnitude < 1e-12) return embedding;
 
-    // Normalize to unit vector
     for (int i = 0; i < embedding.length; i++) {
       embedding[i] /= magnitude;
     }

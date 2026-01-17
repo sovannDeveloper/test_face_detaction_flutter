@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'face_attendance.dart/main.dart';
+import 'main.dart';
 
 class FaceDetectionPage extends StatefulWidget {
   const FaceDetectionPage({super.key});
@@ -16,6 +17,7 @@ class FaceDetectionPage extends StatefulWidget {
 
 class _FaceDetectionPageState extends State<FaceDetectionPage> {
   late final _faceDetection = FaceDetectionService();
+  final _spoofingDetector = FaceAntiSpoofingDetector();
   final _recognition = FaceRecognitionService();
   File? _selectedImage;
   bool _isProcessing = false;
@@ -65,14 +67,27 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
     }
   }
 
-  void _openLiveCamera() async {
+  void _openLiveCamera([bool isBack = false]) async {
+    if (!isBack) {
+      _camera = _cameras
+          .firstWhere((e) => e.lensDirection == CameraLensDirection.front);
+    } else {
+      _camera = _cameras
+          .firstWhere((e) => e.lensDirection == CameraLensDirection.back);
+    }
+
+    _faceDetection.initCameraRotation(_camera!);
+    setState(() {});
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => LiveDetectionScreen(
-            camera: _camera!,
-            recognition: _recognition,
-            detection: _faceDetection),
+          camera: _camera!,
+          recognition: _recognition,
+          detection: _faceDetection,
+          spoofingDetector: spoofingDetector,
+        ),
       ),
     );
   }
@@ -84,70 +99,86 @@ class _FaceDetectionPageState extends State<FaceDetectionPage> {
         appBar: AppBar(title: const Text('Face Recognize')),
         body: _camera == null
             ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      ElevatedButton(
-                          onPressed: () {
-                            _openLiveCamera();
-                          },
-                          child: Text('Open Camera')),
-                      const SizedBox(height: 10),
-                      ElevatedButton(
-                          onPressed: () {
-                            _pickAndDetectFaces(ImageSource.gallery);
-                          },
-                          child: Text('Upload File')),
-                      if (_isProcessing)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(20.0),
-                            child: CircularProgressIndicator(),
-                          ),
-                        ),
-                      if (_errorMessage != null)
-                        Card(
-                          color: Colors.red.shade50,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Text(
-                              _errorMessage!,
-                              style: TextStyle(color: Colors.red.shade900),
-                            ),
-                          ),
-                        ),
-                      if (_selectedImage != null) ...[
-                        const SizedBox(height: 16),
-                        Center(
-                          child: Parent(
-                            style: ParentStyle()..width(150),
-                            child: Image.file(_selectedImage!,
-                                fit: BoxFit.contain),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                            onPressed: () async {
-                              setState(() {
-                                _resultText = 'Processing...';
-                              });
-                              final bytes = _selectedImage!.readAsBytesSync();
-                              final result =
-                                  await _recognition.recognize(bytes);
-
-                              setState(() {
-                                _resultText = result.toString();
-                              });
-                            },
-                            child: Text('Recognize')),
-                      ],
-                      Text(_resultText),
-                    ],
+            : Stack(
+                children: [
+                  CustomPaint(
+                    size: Size.infinite,
+                    painter:
+                        RPSCustomPainter(backgroundColor: Colors.grey.shade200),
                   ),
-                ),
+                  SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ElevatedButton(
+                              onPressed: () {
+                                _openLiveCamera();
+                              },
+                              child: Text('Font Camera')),
+                          const SizedBox(height: 10),
+                          ElevatedButton(
+                              onPressed: () {
+                                _openLiveCamera(true);
+                              },
+                              child: Text('Back Camera')),
+                          const SizedBox(height: 10),
+                          ElevatedButton(
+                              onPressed: () {
+                                _pickAndDetectFaces(ImageSource.gallery);
+                              },
+                              child: Text('Upload File')),
+                          if (_isProcessing)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(20.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                          if (_errorMessage != null)
+                            Card(
+                              color: Colors.red.shade50,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  _errorMessage!,
+                                  style: TextStyle(color: Colors.red.shade900),
+                                ),
+                              ),
+                            ),
+                          if (_selectedImage != null) ...[
+                            const SizedBox(height: 16),
+                            Center(
+                              child: Parent(
+                                style: ParentStyle()..width(150),
+                                child: Image.file(_selectedImage!,
+                                    fit: BoxFit.contain),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                                onPressed: () async {
+                                  setState(() {
+                                    _resultText = 'Processing...';
+                                  });
+                                  final bytes =
+                                      _selectedImage!.readAsBytesSync();
+                                  final result =
+                                      await _recognition.recognize(bytes);
+
+                                  setState(() {
+                                    _resultText = result.toString();
+                                  });
+                                },
+                                child: Text('Recognize')),
+                          ],
+                          Text(_resultText),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
       ),
     );

@@ -21,5 +21,6 @@ part 'func.dart';
 part 'image_util.dart';
 part 'recognition_service.dart';
 part 'screen.dart';
+part 'spoofing.dart';
 part 'storage_util.dart';
 part 'widget.dart';
