@@ -26,10 +26,10 @@ class FaceRecognitionService {
   static Future<void> loadModel() async {
     try {
       _interpreter =
-          await Interpreter.fromAsset('assets/models/mobilefacenet.tflite');
+          await Interpreter.fromAsset('assets/models/mobile_face_net.tflite');
       print('--=> Model Recognized loaded successfully');
     } catch (e) {
-      print('✗ Error loading model: $e');
+      print('--=> Error loading model: $e');
       rethrow;
     }
   }

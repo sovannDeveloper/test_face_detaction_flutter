@@ -167,17 +167,18 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
         if (img != null) {
           final liveDetection = await Future.wait([
             widget.recognition.recognize(img),
-            widget.spoofingDetector.detectSpoof(img),
+            widget.spoofingDetector.detect(img),
           ]);
 
           for (var result in liveDetection) {
             if (result is Map<String, dynamic>) {
               _resultText += '$result\n';
-              print('--=> ================================');
+
               print('--=> Recognition Result: $result');
               continue;
             }
           }
+          print('--=> ================================');
           _resultText += '========================================\n';
         }
 
