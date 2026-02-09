@@ -1,5 +1,4 @@
 {
-  // "dart.flutterSdkPath": "/Volumes/OCSMac/Development/flutter",
   "editor.formatOnSave": true,
   "editor.formatOnPaste": true,
   "editor.codeActionsOnSave": {
@@ -12,7 +11,9 @@
     "editor.formatOnSave": true,
     "editor.formatOnPaste": false,
     "editor.formatOnType": false,
-    "editor.rulers": [120],
+    "editor.rulers": [
+      120
+    ],
     "editor.wordBasedSuggestions": "allDocuments"
   },
   "files.autoSave": "afterDelay",
