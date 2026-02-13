@@ -19,7 +19,9 @@ Face? getSingleFace(List<Face>? faces) {
 }
 
 Future<Uint8List> addImageWatermark(
-    File originalFile, File watermarkFile) async {
+  File originalFile,
+  File watermarkFile,
+) async {
   final original = img.decodeImage(await originalFile.readAsBytes());
   final watermark = img.decodeImage(await watermarkFile.readAsBytes());
 
@@ -35,6 +37,17 @@ Future<Uint8List> addImageWatermark(
   );
 
   return Uint8List.fromList(img.encodePng(original));
+}
+
+bool isFaceFitted(Face? face, Size imageSize) {
+  if (face == null) return false;
+
+  final boundingBox = face.boundingBox;
+  final widthMargin = imageSize.width - boundingBox.width;
+
+  const maxMargin = 100;
+
+  return widthMargin <= maxMargin;
 }
 
 bool isFaceCentered(Face? face, Size imageSize, {double threshold = 0.07}) {
@@ -69,8 +82,11 @@ bool isFaceLookingStraight(Face? face, {double angleThreshold = 10.0}) {
       eulerZ.abs() <= angleThreshold;
 }
 
-Future<Uint8List> addTextWatermark(File imageFile, String watermarkText,
-    {int fontSize = 18}) async {
+Future<Uint8List> addTextWatermark(
+  File imageFile,
+  String watermarkText, {
+  int fontSize = 18,
+}) async {
   final originalImage = img.decodeImage(await imageFile.readAsBytes());
   if (originalImage == null) return Uint8List(0);
 
@@ -95,18 +111,48 @@ Future<Uint8List> addTextWatermark(File imageFile, String watermarkText,
 
   for (final line in lines) {
     // Stroke (4 directions)
-    img.drawString(originalImage, line,
-        font: font, x: padding - strokeWidth, y: y, color: strokeColor);
-    img.drawString(originalImage, line,
-        font: font, x: padding + strokeWidth, y: y, color: strokeColor);
-    img.drawString(originalImage, line,
-        font: font, x: padding, y: y - strokeWidth, color: strokeColor);
-    img.drawString(originalImage, line,
-        font: font, x: padding, y: y + strokeWidth, color: strokeColor);
+    img.drawString(
+      originalImage,
+      line,
+      font: font,
+      x: padding - strokeWidth,
+      y: y,
+      color: strokeColor,
+    );
+    img.drawString(
+      originalImage,
+      line,
+      font: font,
+      x: padding + strokeWidth,
+      y: y,
+      color: strokeColor,
+    );
+    img.drawString(
+      originalImage,
+      line,
+      font: font,
+      x: padding,
+      y: y - strokeWidth,
+      color: strokeColor,
+    );
+    img.drawString(
+      originalImage,
+      line,
+      font: font,
+      x: padding,
+      y: y + strokeWidth,
+      color: strokeColor,
+    );
 
     // Main text
-    img.drawString(originalImage, line,
-        font: font, x: padding, y: y, color: textColor);
+    img.drawString(
+      originalImage,
+      line,
+      font: font,
+      x: padding,
+      y: y,
+      color: textColor,
+    );
 
     y += lineHeight;
   }

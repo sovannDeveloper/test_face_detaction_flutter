@@ -21,11 +21,12 @@ class LiveDetectionScreen extends StatefulWidget {
 }
 
 class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
-  static const _durationInSeconds = 30;
+  static const _durationInSeconds = 300;
 
   _Stage _stage = _Stage.initializing;
-  late final ValueNotifier<int> _timerNotifier =
-      ValueNotifier(_durationInSeconds);
+  late final ValueNotifier<int> _timerNotifier = ValueNotifier(
+    _durationInSeconds,
+  );
   Timer? _timer;
   Uint8List? _capturedImage;
   String _resultText = '';
@@ -255,6 +256,9 @@ class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
 
     final faceCentered = isFaceCentered(face, _imageSize);
     final isFaceStraight = isFaceLookingStraight(face);
+    final isFitted = isFaceFitted(face, _imageSize);
+
+    if (!isFitted) return;
 
     if (!faceCentered || !isFaceStraight) return;
 
@@ -327,7 +331,7 @@ class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
                 fit: StackFit.expand,
                 children: [
                   CameraPreview(_controller),
-                  _buildFaceOverlay(),
+                  Transform.scale(scaleX: -1, child: _buildFaceOverlay()),
                 ],
               ),
             ),
@@ -353,26 +357,28 @@ class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
 
   Widget _buildOverlay() {
     return ValueListenableBuilder(
-        valueListenable: _facesNotifier,
-        builder: (_, face, __) {
-          final instructionData = _getInstructionData(face);
+      valueListenable: _facesNotifier,
+      builder: (_, face, __) {
+        final instructionData = _getInstructionData(face);
 
-          return ValueListenableBuilder<int>(
-            valueListenable: widget.timerNotifier,
-            builder: (context, seconds, child) {
-              return Positioned.fill(
-                child: CustomPaint(
-                  painter: RPSCustomPainter(
-                    borderColor:
-                        instructionData.hideEye ? Colors.grey : Colors.green,
-                    backgroundColor: Colors.amber,
-                    bottomText: '${seconds}s',
-                  ),
+        return ValueListenableBuilder<int>(
+          valueListenable: widget.timerNotifier,
+          builder: (context, seconds, child) {
+            return Positioned.fill(
+              child: CustomPaint(
+                painter: RPSCustomPainter(
+                  borderColor: instructionData.hideEye
+                      ? Colors.grey
+                      : Colors.green,
+                  backgroundColor: Colors.amber,
+                  bottomText: '${seconds}s',
                 ),
-              );
-            },
-          );
-        });
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildBackButton(BuildContext context) {
@@ -409,37 +415,34 @@ class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
   _InstructionData _getInstructionData(Face? face) {
     final isFaceCentered0 = isFaceCentered(face, _imageSize);
     final isFaceStraight = isFaceLookingStraight(face);
+    final isFitted = isFaceFitted(face, _imageSize);
 
-    if (!isFaceStraight) {
+    if (!isFitted) {
+      return const _InstructionData(
+        text: 'Move the camera close',
+        hideEye: true,
+      );
+    } else if (!isFaceStraight) {
       return const _InstructionData(
         text: 'Look straight to the camera',
         hideEye: true,
       );
     } else if (!isFaceCentered0) {
-      return const _InstructionData(
-        text: 'Center your face',
-        hideEye: true,
-      );
+      return const _InstructionData(text: 'Center your face', hideEye: true);
     } else {
-      return const _InstructionData(
-        text: 'Blink your eyes',
-        hideEye: false,
-      );
+      return const _InstructionData(text: 'Blink your eyes', hideEye: false);
     }
   }
 
   Size get _imageSize => Size(
-        _controller.value.previewSize?.height ?? 0,
-        _controller.value.previewSize?.width ?? 0,
-      );
+    _controller.value.previewSize?.height ?? 0,
+    _controller.value.previewSize?.width ?? 0,
+  );
 }
 
 class _InstructionData {
   final String text;
   final bool hideEye;
 
-  const _InstructionData({
-    required this.text,
-    required this.hideEye,
-  });
+  const _InstructionData({required this.text, required this.hideEye});
 }
