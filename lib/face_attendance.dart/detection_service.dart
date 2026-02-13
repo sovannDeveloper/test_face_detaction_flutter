@@ -9,6 +9,7 @@ part of 'main.dart';
 class FaceDetectionService {
   final _detectionStream =
       StreamController<(List<Face>, CameraImage)>.broadcast();
+  final _testImgStream = StreamController<Uint8List>.broadcast();
   late InputImageRotation _rotation;
   bool _isDetecting = false;
   int _frameCount = 0;
@@ -27,6 +28,7 @@ class FaceDetectionService {
   );
 
   Stream<(List<Face>, CameraImage)> get stream => _detectionStream.stream;
+  Stream<Uint8List> get testStream => _testImgStream.stream;
 
   void process(CameraImage image) {
     if (_isDetecting) return;
@@ -50,7 +52,6 @@ class FaceDetectionService {
         image.width.toDouble(),
         image.height.toDouble(),
       );
-
       final inputImage = InputImage.fromBytes(
         bytes: _concatenatePlanes(image.planes),
         metadata: InputImageMetadata(
@@ -61,10 +62,9 @@ class FaceDetectionService {
         ),
       );
 
-      final faces = await _detector.processImage(inputImage).timeout(
-            const Duration(seconds: 2),
-            onTimeout: () => <Face>[],
-          );
+      final faces = await _detector
+          .processImage(inputImage)
+          .timeout(const Duration(seconds: 2), onTimeout: () => <Face>[]);
 
       if (_detectionStream.hasListener) {
         _detectionStream.add((faces, image));
@@ -116,5 +116,6 @@ class FaceDetectionService {
   void dispose() {
     _detector.close();
     _detectionStream.close();
+    _testImgStream.close();
   }
 }

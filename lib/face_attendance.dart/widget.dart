@@ -28,8 +28,11 @@ class FacePainter extends CustomPainter {
 
         if (point == null) continue;
 
-        final offset =
-            scalePoint(point: point, size: imageSize, widgetSize: size);
+        final offset = scalePoint(
+          point: point,
+          size: imageSize,
+          widgetSize: size,
+        );
         final randomRadius =
             baseDotRadius * (0.3 + (1 * (point.x % 100) / 100));
         final randomOpacity = 128 + ((point.y % 128));
@@ -70,10 +73,7 @@ class FacePainter extends CustomPainter {
     final offsetX = (widgetSize.width - scaledWidth) / 2;
     final offsetY = (widgetSize.height - scaledHeight) / 2;
 
-    return Offset(
-      point.x * scale + offsetX,
-      point.y * scale + offsetY,
-    );
+    return Offset(point.x * scale + offsetX, point.y * scale + offsetY);
   }
 
   // Point selection helpers
@@ -130,10 +130,7 @@ class Group6Painter extends CustomPainter {
       // outer rectangle
       ..addRect(const Rect.fromLTWH(0, 0, 391, 391))
       // inner circular hole
-      ..addOval(Rect.fromCircle(
-        center: const Offset(196, 196),
-        radius: 133,
-      ));
+      ..addOval(Rect.fromCircle(center: const Offset(196, 196), radius: 133));
 
     canvas.drawPath(path, backgroundPaint);
 
@@ -143,12 +140,7 @@ class Group6Painter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 5;
 
-    canvas.drawCircle(
-      const Offset(196, 196),
-      135.5,
-      circlePaint,
-    );
-
+    canvas.drawCircle(const Offset(196, 196), 135.5, circlePaint);
     canvas.restore();
   }
 
@@ -187,11 +179,13 @@ class RPSCustomPainter extends CustomPainter {
     double radiusY = (size.width * 0.5) * circleSize;
 
     // Add ellipse cutout
-    path.addOval(Rect.fromCenter(
-      center: Offset(size.width * 0.5, centerY),
-      width: radiusX * 2,
-      height: radiusY * 2,
-    ));
+    path.addOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, centerY),
+        width: radiusX * 2,
+        height: radiusY * 2,
+      ),
+    );
 
     path.fillType = PathFillType.evenOdd;
 
@@ -383,12 +377,14 @@ class _EyeBlinkWidgetState extends State<EyeBlinkWidget> {
                 color: widget.color,
               ),
             if (!widget.hideEye) const SizedBox(width: 8),
-            Text(widget.text,
-                style: TextStyle(
-                  color: widget.color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: widget.size * 0.6,
-                )),
+            Text(
+              widget.text,
+              style: TextStyle(
+                color: widget.color,
+                fontWeight: FontWeight.bold,
+                fontSize: widget.size * 0.6,
+              ),
+            ),
           ],
         ),
       ),

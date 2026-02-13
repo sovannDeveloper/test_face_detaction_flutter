@@ -232,7 +232,7 @@ class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
   void _initializeCamera() {
     _controller = CameraController(
       widget.camera,
-      ResolutionPreset.high,
+      ResolutionPreset.medium,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.nv21,
     );
@@ -314,6 +314,23 @@ class _LiveDetectionWidgetState extends State<_LiveDetectionWidget> {
           _buildOverlay(),
           _buildBackButton(context),
           _buildInstructionText(context),
+          Positioned(
+            bottom: 0,
+            child: StreamBuilder(
+              stream: _detector.testStream,
+              builder: (_, s) {
+                final d = s.data ?? Uint8List.fromList([]);
+
+                print('[log]${d.length}');
+
+                return SizedBox(
+                  height: 200,
+                  width: 200,
+                  child: Image.memory(d),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
