@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'face_attendance.dart/main.dart';
 import 'face_detection_screen_testing.dart';
+import 'multi_faces/main.dart';
 
 final spoofingDetector = FaceAntiSpoofingDetector();
 
@@ -49,9 +50,7 @@ class _MyMainScreenState extends State<MyMainScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).requestFocus(FocusNode()),
       child: Scaffold(
-        appBar: AppBar(
-          title: Text('Face Detection'),
-        ),
+        appBar: AppBar(title: Text('Face Detection')),
         body: Stack(
           children: [
             Padding(
@@ -61,100 +60,121 @@ class _MyMainScreenState extends State<MyMainScreen> {
                   Text('Result: $_text'),
                   const SizedBox(height: 10),
                   ElevatedButton(
-                      onPressed: () async {
-                        _text = 'Loading...';
-                        _loading = true;
-                        setState(() {});
+                    onPressed: () async {
+                      _text = 'Loading...';
+                      _loading = true;
+                      setState(() {});
 
-                        final images = await ImageStorageUtil.loadAllImages();
+                      final images = await ImageStorageUtil.loadAllImages();
 
-                        await FaceRecognitionService.loadRegisterFaces(
-                          images,
-                          onProgress: (current, total) {
-                            print('--==> $total: $current');
-                          },
-                        );
+                      await FaceRecognitionService.loadRegisterFaces(
+                        images,
+                        onProgress: (current, total) {
+                          print('--==> $total: $current');
+                        },
+                      );
 
-                        _loading = false;
-                        setState(() {});
+                      _loading = false;
+                      setState(() {});
 
-                        _go(const FaceDetectionPage());
-                      },
-                      child: Text('Face detection ${_loading ? '...' : ''}')),
+                      _go(const FaceDetectionPage());
+                    },
+                    child: Text('Face detection ${_loading ? '...' : ''}'),
+                  ),
                   const Divider(height: 20),
                   ElevatedButton(
-                      onPressed: () async {
-                        final img = await ImageStorageUtil.pickFromGallery();
-                        if (img != null) {
-                          await ImageStorageUtil.saveImage(img);
-                          setState(() {});
-                        }
-                      },
-                      child: const Text('Register Faces')),
+                    onPressed: () async {
+                      final img = await ImageStorageUtil.pickFromGallery();
+                      if (img != null) {
+                        await ImageStorageUtil.saveImage(img);
+                        setState(() {});
+                      }
+                    },
+                    child: const Text('Register Faces'),
+                  ),
                   FutureBuilder(
-                      future: ImageStorageUtil.loadAllImages(),
-                      builder: (_, s) {
-                        final images = s.data ?? [];
+                    future: ImageStorageUtil.loadAllImages(),
+                    builder: (_, s) {
+                      final images = s.data ?? [];
 
-                        return images.isEmpty
-                            ? const Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.image,
-                                        size: 100, color: Colors.grey),
-                                    SizedBox(height: 20),
-                                    Text('No images',
-                                        style: TextStyle(color: Colors.grey)),
-                                  ],
-                                ),
-                              )
-                            : GridView.builder(
-                                shrinkWrap: true,
-                                primary: false,
-                                padding: const EdgeInsets.all(8),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 3,
-                                  crossAxisSpacing: 8,
-                                  mainAxisSpacing: 8,
-                                ),
-                                itemCount: images.length,
-                                itemBuilder: (context, index) {
-                                  final image = images[index];
-                                  return GestureDetector(
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        Image.file(image, fit: BoxFit.cover),
-                                        Positioned(
-                                          top: 4,
-                                          right: 4,
-                                          child: IconButton(
-                                            icon: const Icon(Icons.delete,
-                                                color: Colors.red, size: 20),
-                                            onPressed: () async {
-                                              final deleted =
-                                                  await ImageStorageUtil
-                                                      .deleteImage(image.path);
-                                              if (deleted) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                      content: Text(
-                                                          'Image deleted')),
-                                                );
-                                                setState(() {});
-                                              }
-                                            },
+                      return images.isEmpty
+                          ? const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.image,
+                                    size: 100,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 20),
+                                  Text(
+                                    'No images',
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : GridView.builder(
+                              shrinkWrap: true,
+                              primary: false,
+                              padding: const EdgeInsets.all(8),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    crossAxisSpacing: 8,
+                                    mainAxisSpacing: 8,
+                                  ),
+                              itemCount: images.length,
+                              itemBuilder: (context, index) {
+                                final image = images[index];
+                                return GestureDetector(
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.file(image, fit: BoxFit.cover),
+                                      Positioned(
+                                        top: 4,
+                                        right: 4,
+                                        child: IconButton(
+                                          icon: const Icon(
+                                            Icons.delete,
+                                            color: Colors.red,
+                                            size: 20,
                                           ),
+                                          onPressed: () async {
+                                            final deleted =
+                                                await ImageStorageUtil.deleteImage(
+                                                  image.path,
+                                                );
+                                            if (deleted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Image deleted',
+                                                  ),
+                                                ),
+                                              );
+                                              setState(() {});
+                                            }
+                                          },
                                         ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              );
-                      })
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                    },
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      _go(MultiFaceScreen());
+                    },
+                    child: const Text('Multi Face'),
+                  ),
                 ],
               ),
             ),

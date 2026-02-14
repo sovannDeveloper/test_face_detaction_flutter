@@ -52,7 +52,7 @@ class FaceRecognitionService {
         final e = files[i];
         final file = File(e.path);
         final bytes = file.readAsBytesSync();
-        final embedding = await _getEmbedding(bytes);
+        final embedding = await getEmbedding(bytes);
 
         if (embedding == null) {
           continue;
@@ -78,7 +78,7 @@ class FaceRecognitionService {
 
   Future<Map<String, dynamic>?> recognize(Uint8List image) async {
     try {
-      List<double>? embedding = await _getEmbedding(image);
+      List<double>? embedding = await getEmbedding(image);
 
       if (embedding == null) {
         return null;
@@ -113,7 +113,7 @@ class FaceRecognitionService {
     }
   }
 
-  static Future<List<double>?> _getEmbedding(Uint8List bytes) async {
+  static Future<List<double>?> getEmbedding(Uint8List bytes) async {
     if (_interpreter == null) {
       return null;
     }

@@ -3,8 +3,9 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
-import 'package:test_face_detaction/img_util.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
+
+import '/img_util.dart';
 
 class FaceRecognitionService0 {
   static Interpreter? interpreter;
@@ -238,7 +239,7 @@ class FaceRecognitionService0 {
         return {
           'name': 'No registered faces',
           'confidence': 0.0,
-          'matched': false
+          'matched': false,
         };
       }
 
@@ -261,7 +262,8 @@ class FaceRecognitionService0 {
         print('Similarity: ${(maxSimilarity * 100).toStringAsFixed(2)}%');
         print('Threshold: ${(threshold * 100).toStringAsFixed(0)}%');
         print(
-            'Match status: ${maxSimilarity > threshold ? "✓ MATCHED" : "✗ NOT MATCHED"}');
+          'Match status: ${maxSimilarity > threshold ? "✓ MATCHED" : "✗ NOT MATCHED"}',
+        );
         print('========== RECOGNITION ENDED ==========\n');
       }
 
@@ -328,8 +330,10 @@ class FaceRecognitionService0 {
     }
 
     // Sort by similarity descending
-    results.sort((a, b) =>
-        (b['similarity'] as double).compareTo(a['similarity'] as double));
+    results.sort(
+      (a, b) =>
+          (b['similarity'] as double).compareTo(a['similarity'] as double),
+    );
     return results;
   }
 }

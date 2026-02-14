@@ -106,7 +106,7 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
                 const Spacer(),
                 Parent(
                   style: ParentStyle()
-                    ..background.color(Colors.black.withOpacity(0.6))
+                    ..background.color(Colors.black.withValues(alpha: 0.6))
                     ..borderRadius(all: 10)
                     ..padding(all: 20),
                   child: Column(
@@ -119,7 +119,10 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
                       ),
                       Text(
                         _resultText,
-                        style: TextStyle(fontSize: 8, color: Colors.white),
+                        style: const TextStyle(
+                          fontSize: 8,
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
