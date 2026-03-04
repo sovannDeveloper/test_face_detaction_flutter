@@ -20,7 +20,7 @@ class _MultiFaceScreenState extends State<MultiFaceScreen> {
     super.initState();
     MyRecognition.initModel();
     IsolateManager.initialize();
-    _timer = Timer.periodic(Duration(milliseconds: 250), (t) {
+    _timer = Timer.periodic(const Duration(milliseconds: 250), (t) {
       _count++;
       setState(() {});
     });
@@ -47,24 +47,24 @@ class _MultiFaceScreenState extends State<MultiFaceScreen> {
               onPressed: () async {
                 _process(0);
               },
-              child: Text('0'),
+              child: const Text('0'),
             ),
 
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             FloatingActionButton(
               onPressed: () async {
                 _process(1);
               },
               child: Text('1'),
             ),
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             FloatingActionButton(
               onPressed: () async {
                 _process(2);
               },
               child: Text('2'),
             ),
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             FloatingActionButton(
               onPressed: () async {
                 _process(3);
@@ -85,7 +85,7 @@ class _MultiFaceScreenState extends State<MultiFaceScreen> {
             ),
             Expanded(
               child: GridView.count(
-                padding: EdgeInsets.all(10),
+                padding: const EdgeInsets.all(10),
                 crossAxisCount: 4,
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
@@ -106,8 +106,8 @@ class _MultiFaceScreenState extends State<MultiFaceScreen> {
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 6),
                             child: Text(
-                              '${_extractFaces[i].split('/').last.split('-').first}',
-                              style: TextStyle(color: Colors.white),
+                              _extractFaces[i].split('/').last.split('-').first,
+                              style: const TextStyle(color: Colors.white),
                             ),
                           ),
                         ),
