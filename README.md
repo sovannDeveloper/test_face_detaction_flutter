@@ -78,4 +78,8 @@ If you encounter build errors, ensure:
 - iOS deployment target matches across all pods
 - Pod cache is cleared: `pod repo update`
 
+
+![TensorFlow Lite Setup](/example2.png)
+
+
 ![TensorFlow Lite Setup](/example.png)
