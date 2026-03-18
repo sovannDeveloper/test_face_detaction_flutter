@@ -71,3 +71,11 @@ cd ..
 flutter build ios --release
 ```
 
+## 5. Troubleshooting
+
+If you encounter build errors, ensure:
+- Xcode is updated to the latest version
+- iOS deployment target matches across all pods
+- Pod cache is cleared: `pod repo update`
+
+![TensorFlow Lite Setup](/example.png)
