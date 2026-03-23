@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
-import 'services/face_detection_service.dart';
+import 'services_old/face_detection_service.dart';
 
 Widget buildInfo(FaceDetectionService0 faceDetection) => Positioned(
       top: 20,
