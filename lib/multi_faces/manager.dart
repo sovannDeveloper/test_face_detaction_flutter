@@ -77,15 +77,19 @@ class IsolateManager {
         return;
       }
 
+      final id = data['id'] as int;
       final modelPath = data['modelPath'] as String;
       final paths = data['paths'] as List<String>;
 
       isolateRecognition ??= MyRecognition(modelPath);
 
+      final List<List<double>?> results = [];
+
       for (int i = 0; i < paths.length; i++) {
         final path = paths[i];
         final file = File(path).readAsBytesSync();
-        await isolateRecognition.getEmbedding(file);
+        final embedding = await isolateRecognition.getEmbedding(file);
+        results.add(embedding);
 
         mainSendPort.send({
           'progress': true,
@@ -93,6 +97,8 @@ class IsolateManager {
           'total': paths.length,
         });
       }
+
+      mainSendPort.send({'id': id, 'result': results});
     }
   }
 

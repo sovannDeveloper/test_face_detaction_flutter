@@ -18,12 +18,12 @@ class RecognitionServiceData {
 }
 
 class FaceRecognitionService {
-  static Interpreter? _interpreter;
+  Interpreter? _interpreter;
 
-  static List<List<List<double>>> registeredFaces = [];
+  List<List<List<double>>> registeredFaces = [];
 
-  static const int _inputSize = 112;
-  static const int _outputSize = 192;
+  final int _inputSize = 112;
+  final int _outputSize = 192;
   // This threshold min: 65 -> 85
   double _threshold = 0.70;
 
@@ -35,9 +35,9 @@ class FaceRecognitionService {
     _threshold = newThreshold;
   }
 
-  static bool get isModelLoaded => _interpreter != null;
+  bool get isModelLoaded => _interpreter != null;
 
-  static Future<void> loadModel() async {
+  Future<void> loadModel() async {
     if (_interpreter != null) return;
 
     try {
@@ -52,7 +52,7 @@ class FaceRecognitionService {
     }
   }
 
-  static Future<(bool, String?)> loadRegisterFaces(
+  Future<(bool, String?)> loadRegisterFaces(
     List<File> files, {
     Function(int current, int total)? onProgress,
   }) async {
@@ -72,7 +72,7 @@ class FaceRecognitionService {
     for (int i = 0; i < files.length; i++) {
       try {
         final bytes = await files[i].readAsBytes();
-        final embedding = await getEmbedding(bytes);
+        final embedding = await _getEmbedding(bytes);
 
         if (embedding == null) {
           errors.add(
@@ -97,17 +97,17 @@ class FaceRecognitionService {
     return (true, errors.isEmpty ? null : errors.join('; '));
   }
 
-  static void registerPersonEmbeddings(List<List<double>> embeddings) {
+  void registerPersonEmbeddings(List<List<double>> embeddings) {
     if (embeddings.isNotEmpty) {
       registeredFaces.add(embeddings);
     }
   }
 
-  static void clearRegistry() => registeredFaces.clear();
+  void clearRegistry() => registeredFaces.clear();
 
   Future<RecognitionServiceData?> recognize(Uint8List image) async {
     try {
-      final embedding = await getEmbedding(image);
+      final embedding = await _getEmbedding(image);
       if (embedding == null) return null;
 
       if (registeredFaces.isEmpty) {
@@ -145,7 +145,7 @@ class FaceRecognitionService {
     }
   }
 
-  static Future<List<double>?> getEmbedding(Uint8List bytes) async {
+  Future<List<double>?> _getEmbedding(Uint8List bytes) async {
     if (_interpreter == null) {
       print('✗ getEmbedding called before model is loaded');
       return null;
@@ -164,12 +164,12 @@ class FaceRecognitionService {
         format: ui.ImageByteFormat.rawRgba,
       );
 
-      frame.image.dispose();
-
       if (byteData == null) {
         print('✗ toByteData returned null');
         return null;
       }
+
+      frame.image.dispose();
 
       final pixels = byteData.buffer.asUint8List();
       final input = Float32List(_inputSize * _inputSize * 3);
@@ -179,6 +179,7 @@ class FaceRecognitionService {
         input[idx++] = (pixels[i] - 127.5) / 128.0; // R
         input[idx++] = (pixels[i + 1] - 127.5) / 128.0; // G
         input[idx++] = (pixels[i + 2] - 127.5) / 128.0; // B
+        // skip alpha pixels[i + 3]
       }
 
       final inputReshaped = input.reshape([1, _inputSize, _inputSize, 3]);
@@ -198,7 +199,7 @@ class FaceRecognitionService {
     }
   }
 
-  static List<double> _normalizeEmbedding(List<double> embedding) {
+  List<double> _normalizeEmbedding(List<double> embedding) {
     double sumSq = 0.0;
     for (final v in embedding) {
       sumSq += v * v;
@@ -213,7 +214,7 @@ class FaceRecognitionService {
     return embedding;
   }
 
-  static double _cosineSimilarity(List<double> a, List<double> b) {
+  double _cosineSimilarity(List<double> a, List<double> b) {
     if (a.length != b.length) {
       print('✗ Embedding length mismatch: ${a.length} vs ${b.length}');
       return 0.0;
