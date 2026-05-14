@@ -5,89 +5,73 @@ class FaceAntiSpoofingDetector {
   List<int>? _inputShape;
   List<int>? _outputShape;
 
-  // Initialize the model
   Future<void> loadModel() async {
     try {
       _interpreter = await Interpreter.fromAsset(
-          'assets/models/face_anti_spoofing.tflite');
+        'assets/models/MiniFASNetV2_float16.tflite',
+      );
       _inputShape = _interpreter!.getInputTensor(0).shape;
       _outputShape = _interpreter!.getOutputTensor(0).shape;
-
-      print(
-          '--=> Model Spoofing loaded successfully in: $_inputShape out: $_outputShape');
+      print('--=> MiniFASNetV2 loaded in: $_inputShape out: $_outputShape');
     } catch (e) {
-      print('--=> Error Spoofing loading model: $e');
+      print('--=> Error loading MiniFASNetV2: $e');
     }
   }
 
-  // Preprocess image for the model
   List<List<List<List<double>>>> preprocessImage(img.Image image) {
-    int inputHeight = _inputShape![1];
-    int inputWidth = _inputShape![2];
+    final h = _inputShape![1];
+    final w = _inputShape![2];
 
-    img.Image resizedImage = img.copyResize(
-      image,
-      width: inputWidth,
-      height: inputHeight,
-    );
+    final resized = img.copyResize(image, width: w, height: h);
 
-    List<List<List<List<double>>>> input = List.generate(
+    // ImageNet normalization used during MiniFASNetV2 training
+    const meanR = 0.485, meanG = 0.456, meanB = 0.406;
+    const stdR = 0.229, stdG = 0.224, stdB = 0.225;
+
+    return List.generate(
       1,
       (_) => List.generate(
-        inputHeight,
-        (y) => List.generate(
-          inputWidth,
-          (x) {
-            img.Pixel pixel = resizedImage.getPixel(x, y);
-            return [
-              pixel.r / 255.0, // Normalize to [0, 1]
-              pixel.g / 255.0,
-              pixel.b / 255.0,
-            ];
-          },
-        ),
+        h,
+        (y) => List.generate(w, (x) {
+          final pixel = resized.getPixel(x, y);
+          return [
+            (pixel.r / 255.0 - meanR) / stdR,
+            (pixel.g / 255.0 - meanG) / stdG,
+            (pixel.b / 255.0 - meanB) / stdB,
+          ];
+        }),
       ),
     );
-
-    return input;
   }
 
-  // Run inference from bytes
   Future<Map<String, dynamic>> detect(Uint8List imageBytes) async {
     if (_interpreter == null) {
       throw Exception('Model not loaded. Call loadModel() first.');
     }
 
-    // Decode bytes to image
-    img.Image? image = img.decodeImage(imageBytes);
+    final image = img.decodeImage(imageBytes);
     if (image == null) {
       throw Exception('Failed to decode image from bytes');
     }
 
-    // Preprocess the image
-    var input = preprocessImage(image);
+    final input = preprocessImage(image);
+    final output = List.filled(_outputShape![1], 0.0)
+        .reshape([1, _outputShape![1]]);
 
-    // Prepare output buffer
-    var output =
-        List.filled(_outputShape![1], 0.0).reshape([1, _outputShape![1]]);
-
-    // Run inference
     _interpreter!.run(input, output);
 
-    // Parse results
-    // Typically output[0][0] is the probability of being real
-    // and output[0][1] is the probability of being fake/spoofed
-    double realScore = output[0][0];
+    print('--=> MiniFASNetV2 output: ${output[0]}');
 
-    print('--=> Inference: ${output[0]}');
+    // MiniFASNetV2 class order: 0=spoof, 1=live/real, 2=wrap-spoof
+    final liveScore = output[0][1] as double;
 
     return {
-      'isReal': realScore <= 0.5,
-      'confidence': realScore,
+      'isReal': liveScore > 0.5,
+      // Return spoof score (1-live) so callers using score<=threshold stay correct
+      'confidence': 1.0 - liveScore,
     };
   }
 
-  // Clean up resources
   void dispose() {
     _interpreter?.close();
   }

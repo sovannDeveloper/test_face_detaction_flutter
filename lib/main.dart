@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'face_attendance.dart/main.dart';
 import 'face_detection_screen_testing.dart';
 import 'multi_faces/main.dart';
+import 'spoofing_test_page.dart';
 
 final spoofingDetector = FaceAntiSpoofingDetector();
 
@@ -203,6 +204,15 @@ class _MyMainScreenState extends State<MyMainScreen> {
             subtitle:
                 'Detect & embed multiple faces from group photos with isolate',
             onTap: () => _go(const MultiFaceScreen()),
+          ),
+          const SizedBox(height: 10),
+          _FeatureCard(
+            icon: Icons.security_rounded,
+            iconColor: _kGreen,
+            title: 'Spoof Test',
+            subtitle:
+                'Test single or batch images for liveness vs spoofing',
+            onTap: () => _go(const SpoofingTestPage()),
           ),
         ],
       ),
