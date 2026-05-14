@@ -42,8 +42,6 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
   List<_FaceResult> _faceResults = [];
   String? _noFaceMsg;
   String? _error;
-
-  // Threshold: score <= threshold → REAL. 0.6 = good balance for attendance.
   double _threshold = 0.6;
 
   final List<_BatchItem> _batch = [];
@@ -93,15 +91,20 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
     final results = <_FaceResult>[];
     for (final face in faces) {
       // Use MiniFASNetV2 scale-2.7 crop via detectWithBbox
-      final raw = await spoofingDetector.detectWithBbox(decoded, face.boundingBox);
+      final raw = await spoofingDetector.detectWithBbox(
+        decoded,
+        face.boundingBox,
+      );
       final score = raw['confidence'] as double;
       final cropBytes = raw['cropBytes'] as Uint8List;
 
-      results.add(_FaceResult(
-        cropBytes: cropBytes,
-        score: score,
-        isReal: score <= _threshold,
-      ));
+      results.add(
+        _FaceResult(
+          cropBytes: cropBytes,
+          score: score,
+          isReal: score <= _threshold,
+        ),
+      );
     }
     return results;
   }
@@ -168,7 +171,10 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
         title: const Text(
           'Spoof Test',
           style: TextStyle(
-              fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white),
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
         actions: [
           _ModeToggle(
@@ -202,8 +208,7 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
           _buildImagePreview(),
           const SizedBox(height: 14),
           _buildPickRow(),
-          const SizedBox(height: 16),
-          _buildThresholdSlider(),
+
           if (_image != null) ...[
             const SizedBox(height: 14),
             _buildAnalyzeButton(),
@@ -219,9 +224,13 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
             ..._faceResults.asMap().entries.map((e) {
               return Padding(
                 padding: EdgeInsets.only(
-                    bottom: e.key < _faceResults.length - 1 ? 10 : 0),
+                  bottom: e.key < _faceResults.length - 1 ? 10 : 0,
+                ),
                 child: _FaceResultCard(
-                    result: e.value, index: e.key, threshold: _threshold),
+                  result: e.value,
+                  index: e.key,
+                  threshold: _threshold,
+                ),
               );
             }),
           ],
@@ -249,15 +258,21 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
             ? const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.image_search_rounded,
-                      size: 44, color: Color(0xFF48484A)),
+                  Icon(
+                    Icons.image_search_rounded,
+                    size: 44,
+                    color: Color(0xFF48484A),
+                  ),
                   SizedBox(height: 10),
-                  Text('No image selected',
-                      style: TextStyle(color: _kText2, fontSize: 14)),
+                  Text(
+                    'No image selected',
+                    style: TextStyle(color: _kText2, fontSize: 14),
+                  ),
                   SizedBox(height: 4),
-                  Text('Pick a photo or take a selfie',
-                      style: TextStyle(
-                          color: Color(0xFF48484A), fontSize: 12)),
+                  Text(
+                    'Pick a photo or take a selfie',
+                    style: TextStyle(color: Color(0xFF48484A), fontSize: 12),
+                  ),
                 ],
               )
             : Stack(
@@ -272,9 +287,10 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
                         children: [
                           CircularProgressIndicator(color: _kPrimary),
                           SizedBox(height: 12),
-                          Text('Detecting face…',
-                              style: TextStyle(
-                                  color: Colors.white, fontSize: 13)),
+                          Text(
+                            'Detecting face…',
+                            style: TextStyle(color: Colors.white, fontSize: 13),
+                          ),
                         ],
                       ),
                     ),
@@ -325,13 +341,13 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
               const Text(
                 'Spoof Threshold',
                 style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: _kPrimary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
@@ -339,9 +355,10 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
                 child: Text(
                   _threshold.toStringAsFixed(2),
                   style: const TextStyle(
-                      fontSize: 12,
-                      color: _kPrimary,
-                      fontWeight: FontWeight.w700),
+                    fontSize: 12,
+                    color: _kPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -354,8 +371,7 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
               thumbColor: _kPrimary,
               overlayColor: _kPrimary.withValues(alpha: 0.15),
               trackHeight: 3,
-              thumbShape:
-                  const RoundSliderThumbShape(enabledThumbRadius: 7),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
             ),
             child: Slider(
               value: _threshold,
@@ -374,10 +390,14 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Strict (more spoof)',
-                  style: TextStyle(fontSize: 10, color: _kText2)),
-              Text('Lenient (more real)',
-                  style: TextStyle(fontSize: 10, color: _kText2)),
+              Text(
+                'Strict (more spoof)',
+                style: TextStyle(fontSize: 10, color: _kText2),
+              ),
+              Text(
+                'Lenient (more real)',
+                style: TextStyle(fontSize: 10, color: _kText2),
+              ),
             ],
           ),
         ],
@@ -393,7 +413,9 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
               width: 16,
               height: 16,
               child: CircularProgressIndicator(
-                  strokeWidth: 2, color: Colors.white),
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
             )
           : const Icon(Icons.security_rounded, size: 18),
       label: Text(_isAnalyzing ? 'Analyzing…' : 'Detect & Analyze'),
@@ -401,10 +423,8 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
         backgroundColor: _kPrimary,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(vertical: 14),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle:
-            const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -422,8 +442,10 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
           const Icon(Icons.info_outline_rounded, color: _kOrange, size: 18),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(msg,
-                style: const TextStyle(color: _kOrange, fontSize: 13)),
+            child: Text(
+              msg,
+              style: const TextStyle(color: _kOrange, fontSize: 13),
+            ),
           ),
         ],
       ),
@@ -438,8 +460,10 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _kRed.withValues(alpha: 0.3)),
       ),
-      child: Text(msg,
-          style: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 13)),
+      child: Text(
+        msg,
+        style: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 13),
+      ),
     );
   }
 
@@ -447,10 +471,11 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
     return Text(
       label.toUpperCase(),
       style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: _kText2,
-          letterSpacing: 0.8),
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: _kText2,
+        letterSpacing: 0.8,
+      ),
     );
   }
 
@@ -504,9 +529,10 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
         Expanded(
           child: _batch.isEmpty
               ? const Center(
-                  child: Text('No images selected',
-                      style: TextStyle(
-                          color: Color(0xFF48484A), fontSize: 14)),
+                  child: Text(
+                    'No images selected',
+                    style: TextStyle(color: Color(0xFF48484A), fontSize: 14),
+                  ),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -521,8 +547,9 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
 
   Widget _buildBatchSummary() {
     final total = _batch.length;
-    final done =
-        _batch.where((b) => b.results != null || b.error != null).length;
+    final done = _batch
+        .where((b) => b.results != null || b.error != null)
+        .length;
     final real = _batch
         .where((b) => b.results?.any((r) => r.isReal) ?? false)
         .length;
@@ -601,13 +628,14 @@ class _FaceResultCard extends StatelessWidget {
                   children: [
                     Text(
                       'Face ${index + 1}',
-                      style: const TextStyle(
-                          fontSize: 12, color: _kText2),
+                      style: const TextStyle(fontSize: 12, color: _kText2),
                     ),
                     const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(6),
@@ -620,10 +648,11 @@ class _FaceResultCard extends StatelessWidget {
                           Text(
                             result.isReal ? 'REAL' : 'SPOOF',
                             style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: color,
-                                letterSpacing: 0.5),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: color,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ],
                       ),
@@ -634,15 +663,15 @@ class _FaceResultCard extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: color),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Raw score: ${result.score.toStringAsFixed(4)}  ·  Threshold: ${threshold.toStringAsFixed(2)}',
-                  style:
-                      const TextStyle(fontSize: 11, color: _kText2),
+                  style: const TextStyle(fontSize: 11, color: _kText2),
                 ),
                 const SizedBox(height: 8),
                 _ScoreBar(score: result.score, threshold: threshold),
@@ -663,71 +692,86 @@ class _ScoreBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final barWidth = constraints.maxWidth;
-      final markerX = threshold * barWidth;
-      return Column(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: Stack(
-              children: [
-                Container(height: 7, color: _kBorder),
-                FractionallySizedBox(
-                  widthFactor: score.clamp(0.0, 1.0),
-                  child: Container(
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [_kGreen, _kOrange, _kRed],
-                        stops: [0.0, 0.5, 1.0],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final barWidth = constraints.maxWidth;
+        final markerX = threshold * barWidth;
+        return Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Stack(
+                children: [
+                  Container(height: 7, color: _kBorder),
+                  FractionallySizedBox(
+                    widthFactor: score.clamp(0.0, 1.0),
+                    child: Container(
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [_kGreen, _kOrange, _kRed],
+                          stops: [0.0, 0.5, 1.0],
+                        ),
                       ),
                     ),
                   ),
+                  // Threshold marker
+                  Positioned(
+                    left: markerX - 1,
+                    top: 0,
+                    bottom: 0,
+                    child: Container(width: 2, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    _dot(_kGreen),
+                    const SizedBox(width: 3),
+                    const Text(
+                      'Real',
+                      style: TextStyle(fontSize: 10, color: _kText2),
+                    ),
+                  ],
                 ),
-                // Threshold marker
-                Positioned(
-                  left: markerX - 1,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(width: 2, color: Colors.white),
+                Row(
+                  children: [
+                    _dot(Colors.white),
+                    const SizedBox(width: 3),
+                    const Text(
+                      'Threshold',
+                      style: TextStyle(fontSize: 10, color: _kText2),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    _dot(_kRed),
+                    const SizedBox(width: 3),
+                    const Text(
+                      'Spoof',
+                      style: TextStyle(fontSize: 10, color: _kText2),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(children: [
-                _dot(_kGreen),
-                const SizedBox(width: 3),
-                const Text('Real', style: TextStyle(fontSize: 10, color: _kText2)),
-              ]),
-              Row(children: [
-                _dot(Colors.white),
-                const SizedBox(width: 3),
-                const Text('Threshold',
-                    style: TextStyle(fontSize: 10, color: _kText2)),
-              ]),
-              Row(children: [
-                _dot(_kRed),
-                const SizedBox(width: 3),
-                const Text('Spoof',
-                    style: TextStyle(fontSize: 10, color: _kText2)),
-              ]),
-            ],
-          ),
-        ],
-      );
-    });
+          ],
+        );
+      },
+    );
   }
 
   Widget _dot(Color c) => Container(
-        width: 7,
-        height: 7,
-        decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-      );
+    width: 7,
+    height: 7,
+    decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+  );
 }
 
 // ── Sub-widgets ────────────────────────────────────────────────────────────
@@ -760,9 +804,10 @@ class _ModeToggle extends StatelessWidget {
             Text(
               batch ? 'Single' : 'Batch',
               style: const TextStyle(
-                  fontSize: 12,
-                  color: _kPrimary,
-                  fontWeight: FontWeight.w600),
+                fontSize: 12,
+                color: _kPrimary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -809,16 +854,19 @@ class _PickButton extends StatelessWidget {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: color),
+                        strokeWidth: 2,
+                        color: color,
+                      ),
                     )
                   : Icon(icon, size: 18, color: color),
               const SizedBox(width: 7),
               Text(
                 label,
                 style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: color),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
               ),
             ],
           ),
@@ -856,8 +904,12 @@ class _BatchTile extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.file(item.file,
-                width: 62, height: 62, fit: BoxFit.cover),
+            child: Image.file(
+              item.file,
+              width: 62,
+              height: 62,
+              fit: BoxFit.cover,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -867,9 +919,10 @@ class _BatchTile extends StatelessWidget {
                 Text(
                   item.file.path.split('/').last,
                   style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -882,37 +935,41 @@ class _BatchTile extends StatelessWidget {
                     style: const TextStyle(fontSize: 12, color: _kText2),
                   ),
                 ] else if (noFace) ...[
-                  const Text('No face detected',
-                      style: TextStyle(fontSize: 12, color: _kOrange)),
+                  const Text(
+                    'No face detected',
+                    style: TextStyle(fontSize: 12, color: _kOrange),
+                  ),
                 ] else if (err != null) ...[
-                  Text(err,
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFFFF6B6B)),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
+                  Text(
+                    err,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFFFF6B6B),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ] else ...[
-                  const Text('Pending…',
-                      style: TextStyle(fontSize: 12, color: _kText2)),
+                  const Text(
+                    'Pending…',
+                    style: TextStyle(fontSize: 12, color: _kText2),
+                  ),
                 ],
               ],
             ),
           ),
           const SizedBox(width: 8),
           if (results != null && results.isNotEmpty)
-            _VerdictBadge(
-              isReal: !results.any((r) => !r.isReal),
-            )
+            _VerdictBadge(isReal: !results.any((r) => !r.isReal))
           else if (noFace)
             const Icon(Icons.face_outlined, color: _kOrange, size: 20)
           else if (err != null)
-            const Icon(Icons.error_outline_rounded,
-                color: _kRed, size: 20)
+            const Icon(Icons.error_outline_rounded, color: _kRed, size: 20)
           else
             const SizedBox(
               width: 18,
               height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: _kText2),
+              child: CircularProgressIndicator(strokeWidth: 2, color: _kText2),
             ),
         ],
       ),
@@ -936,10 +993,11 @@ class _VerdictBadge extends StatelessWidget {
       child: Text(
         isReal ? 'REAL' : 'SPOOF',
         style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            color: color,
-            letterSpacing: 0.5),
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: color,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
@@ -949,17 +1007,25 @@ class _StatChip extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _StatChip(
-      {required this.label, required this.value, required this.color});
+  const _StatChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(value,
-            style: TextStyle(
-                fontSize: 17, fontWeight: FontWeight.w700, color: color)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
         const SizedBox(height: 2),
         Text(label, style: const TextStyle(fontSize: 10, color: _kText2)),
       ],

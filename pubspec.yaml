@@ -10,9 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-
-  tflite_flutter:
-    path: ./tflite_flutter
+  tflite_flutter: ^0.12.1
   flu_wake_lock:
     git: https://github.com/sovannDeveloper/wakelock.git
   division:
