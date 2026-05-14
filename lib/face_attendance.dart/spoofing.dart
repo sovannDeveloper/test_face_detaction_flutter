@@ -54,7 +54,6 @@ class FaceAntiSpoofingDetector {
   List<List<List<List<double>>>> preprocessImage(img.Image image) {
     final h = _inputShape![1];
     final w = _inputShape![2];
-
     final resized = img.copyResize(image, width: w, height: h);
 
     return List.generate(
