@@ -92,24 +92,13 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
 
     final results = <_FaceResult>[];
     for (final face in faces) {
-      final box = face.boundingBox;
-      // Add 20% padding so the model sees full face context
-      final pad = (box.width * 0.2).toInt();
-      final x = (box.left.toInt() - pad).clamp(0, decoded.width - 1);
-      final y = (box.top.toInt() - pad).clamp(0, decoded.height - 1);
-      final w = (box.width.toInt() + pad * 2).clamp(1, decoded.width - x);
-      final h = (box.height.toInt() + pad * 2).clamp(1, decoded.height - y);
-
-      final cropped =
-          img.copyCrop(decoded, x: x, y: y, width: w, height: h);
-      final croppedBytes =
-          Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
-
-      final raw = await spoofingDetector.detect(croppedBytes);
+      // Use MiniFASNetV2 scale-2.7 crop via detectWithBbox
+      final raw = await spoofingDetector.detectWithBbox(decoded, face.boundingBox);
       final score = raw['confidence'] as double;
+      final cropBytes = raw['cropBytes'] as Uint8List;
 
       results.add(_FaceResult(
-        cropBytes: croppedBytes,
+        cropBytes: cropBytes,
         score: score,
         isReal: score <= _threshold,
       ));
