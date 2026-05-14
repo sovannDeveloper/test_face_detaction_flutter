@@ -43,8 +43,8 @@ class _SpoofingTestPageState extends State<SpoofingTestPage> {
   String? _noFaceMsg;
   String? _error;
 
-  // Threshold: score <= threshold → REAL. Default 0.5.
-  double _threshold = 0.5;
+  // Threshold: score <= threshold → REAL. 0.6 = good balance for attendance.
+  double _threshold = 0.6;
 
   final List<_BatchItem> _batch = [];
   bool _isBatchMode = false;
